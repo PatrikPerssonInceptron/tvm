@@ -1526,6 +1526,8 @@ class Neg(OnnxOpConverter):
         if isinstance(inputs[0], relax.Constant):
             data_np = inputs[0].data.numpy()
             return relax.const(_np.negative(data_np), inputs[0].struct_info.dtype)
+        if isinstance(inputs[0], relax.PrimValue):
+            return relax.PrimValue(-inputs[0].value)
         return relax.op.negative(inputs[0])
 
 
@@ -1799,9 +1801,9 @@ class Slice(OnnxOpConverter):
 
         # If all `starts`, `ends`, and `steps` are constant, use strict mode
         # Otherwise, we assume the slice is inbound.
-        assume_inbound = not all(
-            [isinstance(param, (tir.IntImm, int)) for param in [*starts, *ends, *steps]]
-        )
+        # assume_inbound = not all(
+        #     [isinstance(param, (tir.IntImm, int)) for param in [*starts, *ends, *steps]]
+        # )
 
         # Converting PrimExpr to PrimValue since relax.op.strided_slice does not accept PrimExpr
         starts = get_prim_value_list(starts)
@@ -1809,7 +1811,7 @@ class Slice(OnnxOpConverter):
         steps = get_prim_value_list(steps)
 
         return relax.op.strided_slice(
-            data, axes, starts, ends, steps, assume_inbound=assume_inbound
+            data, axes, starts, ends, steps, assume_inbound=False  # assume_inbound
         )
 
 
@@ -2904,15 +2906,11 @@ class DepthToSpace(OnnxOpConverter):
         mode = attr.get("mode", b"DCR").decode("utf-8")
         b, c, h, w = inputs[0].struct_info.shape
         if mode == "DCR":
-            x = relax.op.reshape(
-                inputs[0], (b, block_size, block_size, c // (block_size**2), h, w)
-            )
+            x = relax.op.reshape(inputs[0], (b, block_size, block_size, c // (block_size**2), h, w))
             x = relax.op.permute_dims(x, [0, 3, 4, 1, 5, 2])
             return relax.op.reshape(x, (b, c // (block_size**2), h * block_size, w * block_size))
         elif mode == "CRD":
-            x = relax.op.reshape(
-                inputs[0], (b, c // (block_size**2), block_size, block_size, h, w)
-            )
+            x = relax.op.reshape(inputs[0], (b, c // (block_size**2), block_size, block_size, h, w))
             x = relax.op.permute_dims(x, [0, 1, 4, 2, 5, 3])
             return relax.op.reshape(x, (b, c // (block_size**2), h * block_size, w * block_size))
         else:

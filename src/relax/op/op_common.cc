@@ -21,6 +21,9 @@
 
 #include <algorithm>
 
+#include "tvm/runtime/container/optional.h"
+#include "tvm/tir/expr.h"
+
 namespace tvm {
 namespace relax {
 
@@ -135,8 +138,9 @@ Optional<Array<PrimExpr>> InferBinaryBroadcastShape(const Call& call, const Bloc
                        << " is " << dim0 << " and the second input shape at dim " << x2_ndim - i
                        << " is " << dim1 << ", which are not broadcastable.");
     } else {
-      // Use simple fallback when shape mismatch.
-      return NullOpt;
+      // Use simple fallback when shape cannot be proven to match.
+      output_shape.push_back(analyzer->Simplify(tvm::max(dim0, dim1)));
+      // return NullOpt;
     }
   }
   auto& longer_shape = (x1_ndim > x2_ndim) ? x1_shape : x2_shape;
