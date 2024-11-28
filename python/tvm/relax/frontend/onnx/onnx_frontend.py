@@ -50,6 +50,9 @@ from tvm.ir.supply import NameSupply
 from tvm.tir.generic import cast
 
 from ..common import autopad
+from tvm.arith.analyzer import Analyzer
+
+ana_shape: Analyzer = None
 
 
 def get_type(elem_type: Union[str, int]) -> str:
@@ -126,7 +129,9 @@ def get_value(token, value_dict: Dict[str, tvm.tir.SizeVar]) -> Union[int, tvm.t
         return int(token)
     except ValueError:
         if token not in value_dict or token == "?":
-            value_dict[token] = tvm.tir.SizeVar(token, "int64")
+            var = tvm.tir.SizeVar(token, "int64")
+            ana_shape.update(var, tvm.arith.ConstIntBound(1, tvm.arith.ConstIntBound.POS_INF))
+            value_dict[token] = var
         value = value_dict[token]
         return value
 
@@ -1751,6 +1756,20 @@ def get_prim_value_list(values):
     return new_values
 
 
+def DynamicCanonicalizeIndex(index, extent, stride):
+
+    if index == tvm.arith.ConstIntBound.POS_INF:
+        return extent
+
+    begin_range = tvm.tir.if_then_else(stride < 0, -1, 0)
+
+    end_range = tvm.tir.if_then_else(stride < 0, extent - 1, extent)
+
+    index = tvm.tir.if_then_else(index < 0, index + extent, index)
+
+    return tvm.tir.min(tvm.tir.max(index, begin_range), end_range)
+
+
 class Slice(OnnxOpConverter):
     """Converts an onnx Splice node into an equivalent Relax expression."""
 
@@ -1801,9 +1820,19 @@ class Slice(OnnxOpConverter):
 
         # If all `starts`, `ends`, and `steps` are constant, use strict mode
         # Otherwise, we assume the slice is inbound.
-        # assume_inbound = not all(
-        #     [isinstance(param, (tir.IntImm, int)) for param in [*starts, *ends, *steps]]
-        # )
+        assume_inbound = not all(
+            [isinstance(param, (tir.IntImm, int)) for param in [*starts, *ends, *steps]]
+        )
+
+        starts = [
+            ana_shape.simplify(DynamicCanonicalizeIndex(e, data.struct_info.shape[a], s), 10)
+            for e, a, s in zip(starts, axes, steps)
+        ]
+
+        ends = [
+            ana_shape.simplify(DynamicCanonicalizeIndex(e, data.struct_info.shape[a], s), 10)
+            for e, a, s in zip(ends, axes, steps)
+        ]
 
         # Converting PrimExpr to PrimValue since relax.op.strided_slice does not accept PrimExpr
         starts = get_prim_value_list(starts)
@@ -1811,7 +1840,7 @@ class Slice(OnnxOpConverter):
         steps = get_prim_value_list(steps)
 
         return relax.op.strided_slice(
-            data, axes, starts, ends, steps, assume_inbound=False  # assume_inbound
+            data, axes, starts, ends, steps, assume_inbound=assume_inbound
         )
 
 
@@ -3308,6 +3337,11 @@ class ONNXGraphImporter:
         mod : tvm.IRModule
             The returned relax module
         """
+
+        global ana_shape
+
+        ana_shape = Analyzer()
+
         with self.bb.function("main"):
             with self.bb.dataflow() as df:  # pylint: disable=invalid-name, unused-variable
                 self.opset = opset
