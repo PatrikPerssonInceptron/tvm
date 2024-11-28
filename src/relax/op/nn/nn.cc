@@ -22,6 +22,9 @@
 #include <utility>
 #include <vector>
 
+#include "tvm/runtime/logging.h"
+#include "tvm/src/relax/op/distributed/utils.h"
+
 namespace tvm {
 namespace relax {
 
@@ -357,6 +360,26 @@ StructInfo InferStructInfoLayerNorm(const Call& call, const BlockBuilder& ctx) {
                        : input_sinfo[0];
 }
 
+StructInfo InferDistStructInfoLayerNorm(const Call& call, const BlockBuilder& ctx) {
+  Array<distributed::DTensorStructInfo> input_dtensor_sinfos =
+      distributed::GetInputDTensorStructInfo(call, ctx);
+
+  // This operation can't be sharded
+  for (auto& input_dtensor_sinfo : input_dtensor_sinfos) {
+    ICHECK_EQ(input_dtensor_sinfo->placement->ToString(), "R");
+  }
+
+  ICHECK_GT(input_dtensor_sinfos.size(), 0);
+  TensorStructInfo input_tensor_sinfo = input_dtensor_sinfos[0]->tensor_sinfo;
+
+  if (input_tensor_sinfo->IsUnknownNdim()) {
+    ctx->ReportFatal(Diagnostic::Error(call)
+                     << "Input of distributed operator must have known ndim");
+  }
+
+  return InferShardingSpec(call, ctx, input_tensor_sinfo, distributed::BuildAxisGraphUnary);
+}
+
 InferLayoutOutput InferLayoutLayerNorm(const Call& call,
                                        const Map<String, Array<String>>& desired_layouts,
                                        const VarLayoutMap& var_layout_map) {
@@ -391,6 +414,7 @@ TVM_REGISTER_OP("relax.nn.layer_norm")
     .add_argument("gamma", "Tensor", "The gamma scale factor.")
     .add_argument("beta", "Tensor", "The beta offset factor.")
     .set_attr<FInferStructInfo>("FInferStructInfo", InferStructInfoLayerNorm)
+    .set_attr<FInferStructInfo>("dist.FInferStructInfo", InferDistStructInfoLayerNorm)
     .set_attr<FRelaxInferLayout>("FRelaxInferLayout", InferLayoutLayerNorm)
     .set_attr<TMixedPrecisionPolicy>("TMixedPrecisionPolicy", MixedPrecisionPolicyKind::kFollow)
     .set_attr<Bool>("FPurity", Bool(true));
