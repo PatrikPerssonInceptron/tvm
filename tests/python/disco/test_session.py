@@ -311,5 +311,21 @@ def test_num_workers(session_kind, num_workers):
     assert sess.num_workers == num_workers
 
 
+@pytest.mark.parametrize("session_kind", _all_session_kinds)
+def test_get_from_worker_0(session_kind):  # pylint: disable=invalid-name
+    num_workers = 4
+    sess = session_kind(num_workers)
+    device = tvm.cpu(0)
+
+    x = np.arange(6).astype("float32").reshape([2, 3])
+    x_disc = _numpy_to_worker_0(sess, x, device=device)
+    y_disc = sess.get_global_func("tests.disco.add_one_ndarray")(x_disc)
+
+    y = sess.get_from_worker_0(y_disc).numpy()
+    sess.sync_worker_0()
+    y_expected = x + 1
+    np.testing.assert_equal(y, y_expected)
+
+
 if __name__ == "__main__":
     tvm.testing.main()

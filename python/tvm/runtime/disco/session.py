@@ -257,6 +257,16 @@ class Session(Object):
         """
         return _ffi_api.SessionCopyFromWorker0(self, host_array, remote_array)  # type: ignore # pylint: disable=no-member
 
+    def get_from_worker_0(self, remote_array: DRef):
+        """Get an NDArray from worker-0.
+
+        Parameters
+        ----------
+        remote_array : NDArray
+            The NDArray on worker-0.
+        """
+        return _ffi_api.SessionGetFromWorker0(self, remote_array)  # type: ignore # pylint: disable=no-member
+
     def copy_to_worker_0(self, host_array: NDArray, remote_array: Optional[DRef] = None) -> DRef:
         """Copy the controller-side NDArray to worker-0.
 

@@ -184,9 +184,9 @@ class SocketSessionObj : public BcastSessionObj {
     return remote_channels_[node_id - 1]->Recv();
   }
 
-  void AppendHostNDArray(const NDArray& host_array) final {
-    local_session_->AppendHostNDArray(host_array);
-  }
+  virtual WorkerZeroData& GetLocalWorkerZeroData() final {
+    return local_session_->worker_zero_data_;
+  };
 
   void Shutdown() final {
     // local session will be implicitly shutdown by its destructor
