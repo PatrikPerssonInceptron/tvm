@@ -79,6 +79,10 @@ struct DiscoWorker::Impl {
           CopyFromWorker0(self, reg_id);
           break;
         }
+        case DiscoAction::kGetFromWorker0: {
+          GetFromWorker0(self, reg_id);
+          break;
+        }
         case DiscoAction::kCopyToWorker0: {
           CopyToWorker0(self, reg_id);
           break;
@@ -125,6 +129,24 @@ struct DiscoWorker::Impl {
       NDArray src = GetReg(self, reg_id);
       tgt.CopyFrom(src);
     }
+  }
+
+  static void GetFromWorker0(DiscoWorker* self, int reg_id) {
+    if (self->worker_id != 0) {
+      return;
+    }
+
+    NDArray src = GetReg(self, reg_id);
+    NDArray tgt =
+        NDArray::Empty(src.Shape(), src->dtype, DLDevice{.device_type = kDLCPU, .device_id = 0});
+    std::lock_guard<std::mutex> lock(self->worker_zero_data->queue_mutex_);
+    self->worker_zero_data->host_arrays.push(tgt);
+    tgt.CopyFrom(src);
+
+    TVMValue values[2];
+    int type_codes[2];
+    PackArgs(values, type_codes, static_cast<int>(DiscoAction::kGetFromWorker0), 0);
+    self->channel->Reply(TVMArgs(values, type_codes, 2));
   }
 
   static void CopyToWorker0(DiscoWorker* self, int reg_id) {

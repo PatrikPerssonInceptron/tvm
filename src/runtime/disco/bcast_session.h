@@ -38,6 +38,7 @@ class BcastSessionObj : public SessionObj {
 
   DRef GetGlobalFunc(const std::string& name) override;
   void CopyFromWorker0(const NDArray& host_array, const DRef& remote_array) override;
+  NDArray GetFromWorker0(const DRef& remote_array) override;
   void CopyToWorker0(const NDArray& host_array, const DRef& remote_array) override;
   void SyncWorker(int worker_id) override;
   void Shutdown() override;
@@ -83,6 +84,8 @@ class BcastSessionObj : public SessionObj {
    * \return The packed sequence received.
    */
   virtual TVMArgs RecvReplyPacked(int worker_id) = 0;
+
+  virtual WorkerZeroData& GetLocalWorkerZeroData() { return worker_zero_data_; };
 
   /*! \brief A side channel to communicate with worker-0 */
   WorkerZeroData worker_zero_data_;

@@ -58,6 +58,29 @@ void BcastSessionObj::CopyFromWorker0(const NDArray& host_array, const DRef& rem
                                                remote_array->reg_id);
 }
 
+NDArray BcastSessionObj::GetFromWorker0(const DRef& remote_array) {
+  constexpr auto WORKER_0 = 0;
+
+  BcastSessionObj::Internal::BroadcastUnpacked(this, DiscoAction::kGetFromWorker0,
+                                               remote_array->reg_id);
+  TVMArgs response = this->RecvReplyPacked(WORKER_0);
+
+  ICHECK_EQ(response.size(), 2);
+  const DiscoAction action = static_cast<DiscoAction>(response[0].operator int());
+  ICHECK(action == DiscoAction::kGetFromWorker0);
+  const int ret_worker_id = response[1];
+  ICHECK_EQ(ret_worker_id, WORKER_0);
+
+  auto& worker_zero_data = GetLocalWorkerZeroData();
+  std::lock_guard<std::mutex> lock(worker_zero_data.queue_mutex_);
+
+  ICHECK_GT(worker_zero_data.host_arrays.size(), 0);
+  NDArray array = worker_zero_data.host_arrays.front();
+  worker_zero_data.host_arrays.pop();
+
+  return array;
+}
+
 void BcastSessionObj::CopyToWorker0(const NDArray& host_array, const DRef& remote_array) {
   this->AppendHostNDArray(host_array);
   BcastSessionObj::Internal::BroadcastUnpacked(this, DiscoAction::kCopyToWorker0,
@@ -134,8 +157,9 @@ int BcastSessionObj::AllocateReg() {
 }
 
 void BcastSessionObj::AppendHostNDArray(const NDArray& host_array) {
-  std::lock_guard<std::mutex> lock(worker_zero_data_.queue_mutex_);
-  worker_zero_data_.host_arrays.push(host_array);
+  auto& worker_zero_data = GetLocalWorkerZeroData();
+  std::lock_guard<std::mutex> lock(worker_zero_data.queue_mutex_);
+  worker_zero_data.host_arrays.push(host_array);
 }
 
 }  // namespace runtime

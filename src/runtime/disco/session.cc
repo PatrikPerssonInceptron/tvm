@@ -43,6 +43,8 @@ TVM_REGISTER_GLOBAL("runtime.disco.SessionGetGlobalFunc")
     .set_body_method<Session>(&SessionObj::GetGlobalFunc);
 TVM_REGISTER_GLOBAL("runtime.disco.SessionCopyFromWorker0")
     .set_body_method<Session>(&SessionObj::CopyFromWorker0);
+TVM_REGISTER_GLOBAL("runtime.disco.SessionGetFromWorker0")
+    .set_body_method<Session>(&SessionObj::GetFromWorker0);
 TVM_REGISTER_GLOBAL("runtime.disco.SessionCopyToWorker0")
     .set_body_method<Session>(&SessionObj::CopyToWorker0);
 TVM_REGISTER_GLOBAL("runtime.disco.SessionSyncWorker")

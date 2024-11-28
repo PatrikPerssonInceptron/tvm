@@ -96,6 +96,7 @@ enum class DiscoAction : int32_t {
   kCopyToWorker0 = 6,
   kDebugGetFromRemote = 7,
   kDebugSetRegister = 8,
+  kGetFromWorker0 = 9,
 };
 
 /*! \brief Converts the enum class `DiscoAction` to string */
@@ -119,6 +120,8 @@ inline std::string DiscoAction2String(DiscoAction action) {
       return "kDebugGetFromRemote";
     case DiscoAction::kDebugSetRegister:
       return "kDebugSetRegister";
+    case DiscoAction::kGetFromWorker0:
+      return "kGetFromWorker0";
   }
   LOG(FATAL) << "ValueError: Unknown DiscoAction: " << static_cast<int>(action);
 }
@@ -207,6 +210,7 @@ class SessionObj : public Object {
    * \param remote_array The NDArray on worker-0
    */
   TVM_DLL virtual void CopyFromWorker0(const NDArray& host_array, const DRef& remote_array) = 0;
+  TVM_DLL virtual NDArray GetFromWorker0(const DRef& remote_array) = 0;
   /*!
    * \brief Copy the controler-side NDArray to worker-0
    * \param host_array The array to be copied to worker-0
