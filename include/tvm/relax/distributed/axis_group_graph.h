@@ -218,6 +218,27 @@ struct Axis {
   bool operator==(const Axis& other) const {
     return tensor == other.tensor && dim == other.dim && tuple_index == other.tuple_index;
   }
+
+  friend std::ostream& operator<<(std::ostream& ss, const Axis& axis) {
+    ICHECK_EQ(axis.tuple_index, 0);
+    std::ostringstream sinfo_ss;
+    sinfo_ss << axis.tensor->struct_info_;
+    auto sinfo = sinfo_ss.str();
+    const char* tensor_name;
+    if (sinfo == "R.Tensor((2, 4))") {
+      tensor_name = "x";
+    } else if (sinfo == "R.Tensor((4, 8))") {
+      tensor_name = "w0";
+    } else if (sinfo == "R.Tensor((2, 8))") {
+      tensor_name = "y";
+    } else {
+      ICHECK(false) << sinfo;
+    }
+
+    // ss << "[" << axis.tensor->struct_info_ << " (" << axis.tensor << ") " << axis.dim << "]";
+    ss << "[" << tensor_name << " " << axis.dim << "]";
+    return ss;
+  }
 };
 
 class AxisHash {
@@ -273,6 +294,17 @@ class AxisGroupGraph {
  public:
   enum class EdgeType { kAscend, kDescend, kSimbling };
 
+  static String edge_type_str(EdgeType type) {
+    switch (type) {
+      case EdgeType::kAscend:
+        return "Descend";
+      case EdgeType::kDescend:
+        return "Ascend";
+      case EdgeType::kSimbling:
+        return "Simbling";
+    }
+  }
+
  private:
   static EdgeType ReverseEdgeType(EdgeType type) {
     switch (type) {
@@ -312,6 +344,11 @@ class AxisGroupGraph {
 
     bool operator==(const AxisGraphEdge& other) const {
       return src == other.src && dst == other.dst && type == other.type;
+    }
+
+    friend std::ostream& operator<<(std::ostream& ss, const AxisGraphEdge& edge) {
+      ss << edge_type_str(edge.type) << ": " << edge.src << " -> " << edge.dst;
+      return ss;
     }
   };
 
@@ -451,6 +488,22 @@ class AxisGroupGraph {
       Axis, std::unordered_map<AxisShardingSpec, int, AxisShardingSpecHash, AxisShardingSpecEqual>,
       AxisHash>
       axis_sharding_specs_priority_;
+
+  friend std::ostream& operator<<(std::ostream& ss, const AxisGroupGraph& agg) {
+    ss << std::endl << "AxisGroupGraph src_axis_sharding_spec_" << std::endl;
+    for (auto& [axis, sharding] : agg.src_axis_sharding_spec_) {
+      ss << axis << " " << sharding.first << " " << sharding.second << std::endl;
+    }
+
+    ss << std::endl << "AxisGroupGraph graph_" << std::endl;
+    for (auto& [axis, edges] : agg.graph_) {
+      ss << axis << std::endl;
+      for (auto& edge : edges) {
+        ss << "    " << edge << std::endl;
+      }
+    }
+    return ss;
+  }
 };
 
 using FBuildAxisGraph = std::function<void(const Var& output_var, const Call& call,

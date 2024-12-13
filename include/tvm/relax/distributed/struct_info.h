@@ -57,6 +57,8 @@ class PlacementSpecNode : public Object {
     hash_reduce(static_cast<int>(kind));
   }
 
+  String ToString() const;
+
   static constexpr const char* _type_key = "relax.distributed.PlacementSpec";
   static constexpr const bool _type_has_method_sequal_reduce = true;
   static constexpr const bool _type_has_method_shash_reduce = true;
@@ -88,6 +90,7 @@ class ShardingNode : public PlacementSpecNode {
   }
 
   void SHashReduce(SHashReducer hash_reduce) const { hash_reduce(sharding_dim); }
+
   static constexpr const char* _type_key = "relax.distributed.Sharding";
   TVM_DECLARE_FINAL_OBJECT_INFO(ShardingNode, PlacementSpecNode);
 };
