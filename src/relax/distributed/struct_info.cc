@@ -41,6 +41,16 @@ PlacementSpec PlacementSpec::Replica() {
   return PlacementSpec(n);
 }
 
+String PlacementSpecNode::ToString() const {
+  std::stringstream ss;
+  if (kind == PlacementSpecKind::kReplica) {
+    ss << "R";
+  } else {
+    ss << "S[" << axis << "]";
+  }
+  return ss.str();
+}
+
 TVM_REGISTER_NODE_TYPE(PlacementSpecNode);
 
 TVM_REGISTER_GLOBAL("relax.distributed.Sharding").set_body_typed([](int axis) {

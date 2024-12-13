@@ -39,6 +39,13 @@ namespace tvm {
 namespace relax {
 namespace distributed {
 
+template <typename T>
+std::string any_to_string(T t) {
+  std::ostringstream ss;
+  ss << t;
+  return ss.str();
+}
+
 void CollectAxisGraphBinary(const VarBindingNode* binding, const CallNode* call,
                             AxisGroupGraph* axis_group_graph) {
   const std::vector<std::string> binary_op_names = {
@@ -283,8 +290,7 @@ class ShardingConflictHandler : public ExprVisitor {
       if (device_mesh.defined()) {
         ICHECK(StructuralEqual()(device_mesh.value(), sharding_spec.first))
             << "Sharding conflict detected for tensor " << var->name_hint()
-            << ": Device Mesh mismatch"
-            << ". Conflict Handling logic will be added in the future.";
+            << ": Device Mesh mismatch" << ". Conflict Handling logic will be added in the future.";
       } else {
         device_mesh = sharding_spec.first;
       }
@@ -350,6 +356,7 @@ class DistributedIRBuilder : public ExprMutator {
       if (func_ == nullptr || !IsShardingAnnotatedFunc(GetRef<Function>(func_))) {
         continue;
       }
+      LOG_INFO << "BEFORE: " << GetRef<Function>(func_);
       Function func = RewriteFunction(GetRef<Function>(func_), mod);
       builder_->UpdateFunction(gv, func);
     }
@@ -367,6 +374,12 @@ class DistributedIRBuilder : public ExprMutator {
     ICHECK(device_mesh.defined()) << expr << "[" << tuple_idx << "] is not assigned device mesh";
     Array<PlacementSpec> placement_specs(
         std::vector<PlacementSpec>(device_mesh->shape.size(), PlacementSpec::Replica()));
+
+    LOG_INFO << "ndim " << ndim;
+    LOG_INFO << "tuple_idx " << tuple_idx;
+    LOG_INFO << "device_mesh " << device_mesh;
+    LOG_INFO << "placement " << placement_specs[0]->ToString();
+
     for (int i = 0; i < ndim; i++) {
       AxisShardingSpec sharding_spec;
       bool has_sharding_spec;
@@ -374,6 +387,7 @@ class DistributedIRBuilder : public ExprMutator {
           axis_group_graph_.GetAxisShardingSpec({expr.get(), i, tuple_idx});
       if (has_sharding_spec) {
         int sharding_dim = sharding_spec.second;
+        LOG_INFO << "placement_specs.Set " << sharding_dim << " " << i;
         placement_specs.Set(sharding_dim, PlacementSpec::Sharding(i));
       }
     }
@@ -411,17 +425,25 @@ class DistributedIRBuilder : public ExprMutator {
   }
 
   Function RewriteFunction(Function func, IRModule mod) {
+    LOG_INFO << func;
     // Step 1. Construct AxisGroupGraph
     AxisGroupGraphBuilder::BuildAxisGroupGraph(&axis_group_graph_, func, mod);
     // Step 2. Collect Sharding Annotation
     ShardingAnnotationCollector::CollectShardingAnnotation(&axis_group_graph_, func);
     // Step 3. Handle Sharding Conflict
     ShardingConflictHandler::HandleShardingConflict(&axis_group_graph_, func);
+
+    LOG_INFO << axis_group_graph_;
+
     // Step 4. Rewrite Function
     Array<Var> new_params;
     for (const Var& var : func->params) {
       if (GetStructInfoAs<TensorStructInfoNode>(var) || GetStructInfoAs<TupleStructInfoNode>(var)) {
+        std::cout << std::endl;
+        LOG_INFO << "##### " << var << " #####";
+        LOG_INFO << "var " << var->struct_info_;
         Var new_param = Downcast<Var>(RewriteInputTensorAndConstant(var));
+        LOG_INFO << "new_param " << new_param->struct_info_;
         input_tensor_remap_.Set(var, new_param);
         new_params.push_back(new_param);
       } else {
