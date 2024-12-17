@@ -389,7 +389,7 @@ class AxisGroupGraph {
    *              kSimbling means other cases
    */
   void JoinAxis(Axis axis1, Axis axis2, EdgeType type) {
-    LOG_INFO << "JoinAxis " << axis1 << " " << axis2;
+    // LOG_INFO << "JoinAxis " << axis1 << " " << axis2;
     AddEdge(axis1, axis2, type);
     AddEdge(axis2, axis1, ReverseEdgeType(type));
   }
