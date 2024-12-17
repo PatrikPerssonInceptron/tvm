@@ -169,6 +169,10 @@ class AxisGroupGraphBuilder : public ExprVisitor {
       BuildAxisGraphSimulatedAffine(binding->var, GetRef<Call>(val), axis_group_graph_);
     }
 
+    if (val->op.same_as(Op::Get("inceptron.relax.realized.affine.dense"))) {
+      BuildAxisGraphRealizedAffineDense(binding->var, GetRef<Call>(val), axis_group_graph_);
+    }
+
     static const Op& call_tir_op = Op::Get("relax.call_tir");
     if (val->op.same_as(call_tir_op)) {
       if (Optional<tir::PrimFunc> func = MatchPrimFunc(mod_, val->args[0])) {
