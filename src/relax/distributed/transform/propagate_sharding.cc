@@ -164,6 +164,11 @@ class AxisGroupGraphBuilder : public ExprVisitor {
     CollectAxisGraphMatmul(binding, val, axis_group_graph_);
     CollectAxisGraphPermuteDims(binding, val, axis_group_graph_);
     CollectAxisGraphReshape(binding, val, axis_group_graph_);
+
+    if (val->op.same_as(Op::Get("inceptron.relax.simulated.affine"))) {
+      BuildAxisGraphSimulatedAffine(binding->var, GetRef<Call>(val), axis_group_graph_);
+    }
+
     static const Op& call_tir_op = Op::Get("relax.call_tir");
     if (val->op.same_as(call_tir_op)) {
       if (Optional<tir::PrimFunc> func = MatchPrimFunc(mod_, val->args[0])) {

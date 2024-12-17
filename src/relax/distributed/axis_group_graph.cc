@@ -99,6 +99,27 @@ void BuildAxisGraphUnary(const Var& output_var, const Call& call,
   UnaryOpHelper(tensor_list, axis_group_graph);
 }
 
+void BuildAxisGraphSimulatedAffine(const Var& output_var, const Call& call,
+                                   distributed::AxisGroupGraph* axis_group_graph) {
+  Array<Expr> args;
+
+  for (auto i = 0; i < 3; i++) {  // (weight, scale, zero_point)
+    auto& arg = call->args[i];
+    if (arg->IsInstance<VarNode>()) {
+      args.push_back(arg);
+    }
+  }
+
+  const auto num_dim = GetTensorStructInfo(output_var)->ndim;
+
+  for (auto dim_idx = 0; dim_idx < num_dim; dim_idx++) {
+    for (auto& arg : args) {
+      axis_group_graph->JoinAxis({arg.get(), dim_idx}, {output_var.get(), dim_idx},
+                                 distributed::AxisGroupGraph::EdgeType::kDescend);
+    }
+  }
+}
+
 void BuildAxisGraphBinary(const Var& output_var, const Call& call,
                           distributed::AxisGroupGraph* axis_group_graph) {
   Array<Expr> tensor_list;  // vars in param and output
