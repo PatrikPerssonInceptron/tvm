@@ -156,8 +156,8 @@ class AxisGroupGraphBuilder : public ExprVisitor {
       : axis_group_graph_(axis_group_graph), mod_(mod) {}
 
   void VisitBinding_(const VarBindingNode* binding, const CallNode* val) {
-    LOG_INFO << "### VisitBinding_ BEFORE " << binding->var << " " << val->op;
-    LOG_INFO << *axis_group_graph_;
+    // LOG_INFO << "### VisitBinding_ BEFORE " << binding->var << " " << val->op;
+    // LOG_INFO << *axis_group_graph_;
     CollectAxisGraphBinary(binding, val, axis_group_graph_);
     CollectAxisGraphUnary(binding, val, axis_group_graph_);
     CollectAxisGraphReduce(binding, val, axis_group_graph_);
@@ -176,8 +176,8 @@ class AxisGroupGraphBuilder : public ExprVisitor {
       }
     }
     CollectAxisGraphForDeviceMesh(binding, val, axis_group_graph_);
-    LOG_INFO << "### VisitBinding_ AFTER " << binding->var << " " << val->op;
-    LOG_INFO << *axis_group_graph_;
+    // LOG_INFO << "### VisitBinding_ AFTER " << binding->var << " " << val->op;
+    // LOG_INFO << *axis_group_graph_;
     ExprVisitor::VisitBinding_(binding, val);
   }
 
@@ -365,10 +365,10 @@ class DistributedIRBuilder : public ExprMutator {
       if (func_ == nullptr || !IsShardingAnnotatedFunc(GetRef<Function>(func_))) {
         continue;
       }
-      LOG_INFO << "BEFORE: " << GetRef<Function>(func_);
+      // LOG_INFO << "BEFORE: " << GetRef<Function>(func_);
       Function func = RewriteFunction(GetRef<Function>(func_), mod);
       builder_->UpdateFunction(gv, func);
-      LOG_INFO << "AFTER: " << GetRef<Function>(func_);
+      // LOG_INFO << "AFTER: " << GetRef<Function>(func_);
     }
     return builder_->GetContextIRModule();
   }
@@ -385,10 +385,10 @@ class DistributedIRBuilder : public ExprMutator {
     Array<PlacementSpec> placement_specs(
         std::vector<PlacementSpec>(device_mesh->shape.size(), PlacementSpec::Replica()));
 
-    LOG_INFO << "ndim " << ndim;
-    LOG_INFO << "tuple_idx " << tuple_idx;
-    LOG_INFO << "device_mesh " << device_mesh;
-    LOG_INFO << "placement " << placement_specs[0]->ToString();
+    // LOG_INFO << "ndim " << ndim;
+    // LOG_INFO << "tuple_idx " << tuple_idx;
+    // LOG_INFO << "device_mesh " << device_mesh;
+    // LOG_INFO << "placement " << placement_specs[0]->ToString();
 
     for (int i = 0; i < ndim; i++) {
       AxisShardingSpec sharding_spec;
@@ -397,7 +397,7 @@ class DistributedIRBuilder : public ExprMutator {
           axis_group_graph_.GetAxisShardingSpec({expr.get(), i, tuple_idx});
       if (has_sharding_spec) {
         int sharding_dim = sharding_spec.second;
-        LOG_INFO << "placement_specs.Set " << sharding_dim << " " << i;
+        // LOG_INFO << "placement_specs.Set " << sharding_dim << " " << i;
         placement_specs.Set(sharding_dim, PlacementSpec::Sharding(i));
       }
     }
@@ -437,26 +437,26 @@ class DistributedIRBuilder : public ExprMutator {
   Function RewriteFunction(Function func, IRModule mod) {
     // Step 1. Construct AxisGroupGraph
     AxisGroupGraphBuilder::BuildAxisGroupGraph(&axis_group_graph_, func, mod);
-    LOG_INFO << "### BuildAxisGroupGraph ###";
-    LOG_INFO << axis_group_graph_;
+    // LOG_INFO << "### BuildAxisGroupGraph ###";
+    // LOG_INFO << axis_group_graph_;
     // Step 2. Collect Sharding Annotation
     ShardingAnnotationCollector::CollectShardingAnnotation(&axis_group_graph_, func);
-    // LOG_INFO << "### CollectShardingAnnotation ###";
-    // LOG_INFO << axis_group_graph_;
+    // // LOG_INFO << "### CollectShardingAnnotation ###";
+    // // LOG_INFO << axis_group_graph_;
     // Step 3. Handle Sharding Conflict
     ShardingConflictHandler::HandleShardingConflict(&axis_group_graph_, func);
-    // LOG_INFO << "### HandleShardingConflict ###";
-    // LOG_INFO << axis_group_graph_;
+    // // LOG_INFO << "### HandleShardingConflict ###";
+    // // LOG_INFO << axis_group_graph_;
 
     // Step 4. Rewrite Function
     Array<Var> new_params;
     for (const Var& var : func->params) {
       if (GetStructInfoAs<TensorStructInfoNode>(var) || GetStructInfoAs<TupleStructInfoNode>(var)) {
         std::cout << std::endl;
-        LOG_INFO << "##### " << var << " #####";
-        LOG_INFO << "var " << var->struct_info_;
+        // LOG_INFO << "##### " << var << " #####";
+        // LOG_INFO << "var " << var->struct_info_;
         Var new_param = Downcast<Var>(RewriteInputTensorAndConstant(var));
-        LOG_INFO << "new_param " << new_param->struct_info_;
+        // LOG_INFO << "new_param " << new_param->struct_info_;
         input_tensor_remap_.Set(var, new_param);
         new_params.push_back(new_param);
       } else {
