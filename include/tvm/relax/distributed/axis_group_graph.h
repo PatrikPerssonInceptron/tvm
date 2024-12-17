@@ -224,19 +224,24 @@ struct Axis {
     std::ostringstream sinfo_ss;
     sinfo_ss << axis.tensor->struct_info_;
     auto sinfo = sinfo_ss.str();
-    const char* tensor_name;
-    if (sinfo == "R.Tensor((2, 4))") {
-      tensor_name = "x";
-    } else if (sinfo == "R.Tensor((4, 8))") {
-      tensor_name = "w0";
-    } else if (sinfo == "R.Tensor((2, 8))") {
-      tensor_name = "y";
-    } else {
-      ICHECK(false) << sinfo;
-    }
+
+    auto start = 9;
+    auto end = sinfo.find_first_of(")", start) + 1;
+
+    // const char* tensor_name;
+    // if (sinfo == "R.Tensor((2, 4))") {
+    //   tensor_name = "x";
+    // } else if (sinfo == "R.Tensor((4, 8))") {
+    //   tensor_name = "w0";
+    // } else if (sinfo == "R.Tensor((2, 8))") {
+    //   tensor_name = "y";
+    // } else {
+    //   ICHECK(false) << sinfo;
+    // }
 
     // ss << "[" << axis.tensor->struct_info_ << " (" << axis.tensor << ") " << axis.dim << "]";
-    ss << "[" << tensor_name << " " << axis.dim << "]";
+    ss << "[" << sinfo.substr(start, end - start) << " (" << axis.tensor << ") " << " " << axis.dim
+       << "]";
     return ss;
   }
 };
@@ -384,6 +389,7 @@ class AxisGroupGraph {
    *              kSimbling means other cases
    */
   void JoinAxis(Axis axis1, Axis axis2, EdgeType type) {
+    LOG_INFO << "JoinAxis " << axis1 << " " << axis2;
     AddEdge(axis1, axis2, type);
     AddEdge(axis2, axis1, ReverseEdgeType(type));
   }
@@ -496,10 +502,13 @@ class AxisGroupGraph {
     }
 
     ss << std::endl << "AxisGroupGraph graph_" << std::endl;
-    for (auto& [axis, edges] : agg.graph_) {
-      ss << axis << std::endl;
+    for (auto& [_axis, edges] : agg.graph_) {
+      // ss << axis << std::endl;
+      // for (auto& edge : edges) {
+      //   ss << "    " << edge << std::endl;
+      // }
       for (auto& edge : edges) {
-        ss << "    " << edge << std::endl;
+        ss << edge << std::endl;
       }
     }
     return ss;

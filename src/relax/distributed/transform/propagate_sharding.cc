@@ -156,6 +156,8 @@ class AxisGroupGraphBuilder : public ExprVisitor {
       : axis_group_graph_(axis_group_graph), mod_(mod) {}
 
   void VisitBinding_(const VarBindingNode* binding, const CallNode* val) {
+    LOG_INFO << "### VisitBinding_ BEFORE " << binding->var << " " << val->op;
+    LOG_INFO << *axis_group_graph_;
     CollectAxisGraphBinary(binding, val, axis_group_graph_);
     CollectAxisGraphUnary(binding, val, axis_group_graph_);
     CollectAxisGraphReduce(binding, val, axis_group_graph_);
@@ -169,6 +171,8 @@ class AxisGroupGraphBuilder : public ExprVisitor {
       }
     }
     CollectAxisGraphForDeviceMesh(binding, val, axis_group_graph_);
+    LOG_INFO << "### VisitBinding_ AFTER " << binding->var << " " << val->op;
+    LOG_INFO << *axis_group_graph_;
     ExprVisitor::VisitBinding_(binding, val);
   }
 
@@ -359,6 +363,7 @@ class DistributedIRBuilder : public ExprMutator {
       LOG_INFO << "BEFORE: " << GetRef<Function>(func_);
       Function func = RewriteFunction(GetRef<Function>(func_), mod);
       builder_->UpdateFunction(gv, func);
+      LOG_INFO << "AFTER: " << GetRef<Function>(func_);
     }
     return builder_->GetContextIRModule();
   }
@@ -425,15 +430,18 @@ class DistributedIRBuilder : public ExprMutator {
   }
 
   Function RewriteFunction(Function func, IRModule mod) {
-    LOG_INFO << func;
     // Step 1. Construct AxisGroupGraph
     AxisGroupGraphBuilder::BuildAxisGroupGraph(&axis_group_graph_, func, mod);
+    LOG_INFO << "### BuildAxisGroupGraph ###";
+    LOG_INFO << axis_group_graph_;
     // Step 2. Collect Sharding Annotation
     ShardingAnnotationCollector::CollectShardingAnnotation(&axis_group_graph_, func);
+    // LOG_INFO << "### CollectShardingAnnotation ###";
+    // LOG_INFO << axis_group_graph_;
     // Step 3. Handle Sharding Conflict
     ShardingConflictHandler::HandleShardingConflict(&axis_group_graph_, func);
-
-    LOG_INFO << axis_group_graph_;
+    // LOG_INFO << "### HandleShardingConflict ###";
+    // LOG_INFO << axis_group_graph_;
 
     // Step 4. Rewrite Function
     Array<Var> new_params;
