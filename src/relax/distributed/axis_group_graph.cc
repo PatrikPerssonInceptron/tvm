@@ -75,7 +75,7 @@ const TensorStructInfoNode* GetTensorStructInfo(Expr tensor) {
   throw;
 }
 
-void UnaryOpHelper(Array<Expr> tensor_list, distributed::AxisGroupGraph* axis_group_graph) {
+void UnaryOpHelper(Array<Expr> tensor_list, distributed::AxisGroupGraph& axis_group_graph) {
   int n_dim = GetTensorStructInfo(tensor_list[0])->ndim;
   for (const auto& tensor : tensor_list) {
     ICHECK(GetTensorStructInfo(tensor)->ndim == n_dim);
@@ -90,7 +90,7 @@ void UnaryOpHelper(Array<Expr> tensor_list, distributed::AxisGroupGraph* axis_gr
 }
 
 void BuildAxisGraphUnary(const Var& output_var, const Call& call,
-                         distributed::AxisGroupGraph* axis_group_graph) {
+                         distributed::AxisGroupGraph& axis_group_graph) {
   Array<Expr> tensor_list;  // vars in param and output
   if (call->args[0]->IsInstance<VarNode>()) {
     tensor_list.push_back(call->args[0]);
@@ -99,29 +99,8 @@ void BuildAxisGraphUnary(const Var& output_var, const Call& call,
   UnaryOpHelper(tensor_list, axis_group_graph);
 }
 
-void BuildAxisGraphSimulatedAffine(const Var& output_var, const Call& call,
-                                   distributed::AxisGroupGraph* axis_group_graph) {
-  Array<Expr> args;
-
-  for (auto i = 0; i < 3; i++) {  // (weight, scale, zero_point)
-    auto& arg = call->args[i];
-    if (arg->IsInstance<VarNode>()) {
-      args.push_back(arg);
-    }
-  }
-
-  const auto num_dim = GetTensorStructInfo(output_var)->ndim;
-
-  for (auto dim_idx = 0; dim_idx < num_dim; dim_idx++) {
-    for (auto& arg : args) {
-      axis_group_graph->JoinAxis({arg.get(), dim_idx}, {output_var.get(), dim_idx},
-                                 distributed::AxisGroupGraph::EdgeType::kDescend);
-    }
-  }
-}
-
 void BuildAxisGraphBinary(const Var& output_var, const Call& call,
-                          distributed::AxisGroupGraph* axis_group_graph) {
+                          distributed::AxisGroupGraph& axis_group_graph) {
   Array<Expr> tensor_list;  // vars in param and output
   if (call->args[0]->struct_info_.as<TensorStructInfoNode>() ||
       call->args[0]->struct_info_.as<DTensorStructInfoNode>()) {
@@ -181,7 +160,7 @@ void BuildAxisGraphBinary(const Var& output_var, const Call& call,
 }
 
 void BuildAxisGraphReduce(const Var& output_var, const Call& call,
-                          distributed::AxisGroupGraph* axis_group_graph) {
+                          distributed::AxisGroupGraph& axis_group_graph) {
   Expr input_tensor = call->args[0];
   Array<Integer> axes;
   bool keepdims;
@@ -227,7 +206,7 @@ void BuildAxisGraphReduce(const Var& output_var, const Call& call,
 }
 
 void BuildAxisGraphMatmul(const Var& output_var, const Call& call,
-                          distributed::AxisGroupGraph* axis_group_graph) {
+                          distributed::AxisGroupGraph& axis_group_graph) {
   Expr x1 = call->args[0];
   Expr x2 = call->args[1];
   Var x3 = output_var;
@@ -301,7 +280,7 @@ void BuildAxisGraphMatmul(const Var& output_var, const Call& call,
 }
 
 void BuildAxisGraphPermuteDims(const Var& output_var, const Call& call,
-                               distributed::AxisGroupGraph* axis_group_graph) {
+                               distributed::AxisGroupGraph& axis_group_graph) {
   Expr input_tensor = call->args[0];
   const auto* attrs = call->attrs.as<PermuteDimsAttrs>();
   ICHECK(attrs);
@@ -326,7 +305,7 @@ void BuildAxisGraphPermuteDims(const Var& output_var, const Call& call,
   }
 }
 void BuildAxisGraphReshape(const Var& output_var, const Call& call,
-                           distributed::AxisGroupGraph* axis_group_graph) {
+                           distributed::AxisGroupGraph& axis_group_graph) {
   Expr input_tensor = call->args[0];
   const auto* tensor_sinfo = GetTensorStructInfo(input_tensor);
   const auto* new_shape_sinfo = GetStructInfoAs<ShapeStructInfoNode>(call->args[1]);
@@ -368,7 +347,7 @@ inline int GetNumOutput(Call call) {
 }
 
 void BuildAxisGraphCallTIR(const Var& output_var, const Call& call, const tir::PrimFunc& func,
-                           distributed::AxisGroupGraph* axis_group_graph) {
+                           distributed::AxisGroupGraph& axis_group_graph) {
   auto tir_var_axis_group_list = tir::BufferAxisGraphExtractor::GetTIRVarAxisGraph(func);
   Map<tir::Var, Expr> input_var_to_relax_expr;
   Array<Expr> input_list = Downcast<Tuple>(call->args[1])->fields;

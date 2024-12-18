@@ -297,6 +297,10 @@ class AxisShardingSpecHash {
  */
 class AxisGroupGraphNode : public Object {
  public:
+  static constexpr const uint32_t _type_index = TypeIndex::kDynamic;
+  static constexpr const char* _type_key = "relax.AxisGroupGraph";
+  TVM_DECLARE_BASE_OBJECT_INFO(AxisGroupGraphNode, Object);
+
   enum class EdgeType { kAscend, kDescend, kSimbling };
 
   static String edge_type_str(EdgeType type) {
@@ -513,39 +517,34 @@ class AxisGroupGraphNode : public Object {
     }
     return ss;
   }
-
-  static constexpr const uint32_t _type_index = TypeIndex::kDynamic;
-  static constexpr const char* _type_key = "relax.AxisGroupGraph";
-  TVM_DECLARE_BASE_OBJECT_INFO(AxisGroupGraphNode, Object);
 };
 
 class AxisGroupGraph : public ObjectRef {
  public:
   using EdgeType = AxisGroupGraphNode::EdgeType;
 
-  //  private:
   TVM_DEFINE_MUTABLE_OBJECT_REF_METHODS(AxisGroupGraph, ObjectRef, AxisGroupGraphNode);
 };
 
 using FBuildAxisGraph = std::function<void(const Var& output_var, const Call& call,
-                                           distributed::AxisGroupGraph* axis_group_graph)>;
+                                           distributed::AxisGroupGraph& axis_group_graph)>;
 
 void BuildAxisGraphUnary(const Var& output_var, const Call& call,
-                         distributed::AxisGroupGraph* axis_group_graph);
+                         distributed::AxisGroupGraph& axis_group_graph);
 void BuildAxisGraphBinary(const Var& output_var, const Call& call,
-                          distributed::AxisGroupGraph* axis_group_graph);
+                          distributed::AxisGroupGraph& axis_group_graph);
 void BuildAxisGraphReduce(const Var& output_var, const Call& call,
-                          distributed::AxisGroupGraph* axis_group_graph);
+                          distributed::AxisGroupGraph& axis_group_graph);
 void BuildAxisGraphMatmul(const Var& output_var, const Call& call,
-                          distributed::AxisGroupGraph* axis_group_graph);
+                          distributed::AxisGroupGraph& axis_group_graph);
 void BuildAxisGraphPermuteDims(const Var& output_var, const Call& call,
-                               distributed::AxisGroupGraph* axis_group_graph);
+                               distributed::AxisGroupGraph& axis_group_graph);
 void BuildAxisGraphReshape(const Var& output_var, const Call& call,
-                           distributed::AxisGroupGraph* axis_group_graph);
+                           distributed::AxisGroupGraph& axis_group_graph);
 void BuildAxisGraphCallTIR(const Var& output_var, const Call& call, const tir::PrimFunc& func,
-                           distributed::AxisGroupGraph* axis_group_graph);
+                           distributed::AxisGroupGraph& axis_group_graph);
 void BuildAxisGraphSimulatedAffine(const Var& output_var, const Call& call,
-                                   distributed::AxisGroupGraph* axis_group_graph);
+                                   distributed::AxisGroupGraph& axis_group_graph);
 
 const TensorStructInfoNode* GetTensorStructInfo(Expr tensor);
 

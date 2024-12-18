@@ -49,8 +49,8 @@ StructInfo InferShardingSpec(const Call& call, const BlockBuilder& ctx,
   }
   distributed::DeviceMesh device_mesh = input_dtensor_sinfos[0]->device_mesh;
   Var output_var("output", orig_output_sinfo);
-  distributed::AxisGroupGraph axis_group_graph;
-  f_build_graph(output_var, call, &axis_group_graph);
+  distributed::AxisGroupGraph axis_group_graph(make_object<AxisGroupGraphNode>());
+  f_build_graph(output_var, call, axis_group_graph);
   Array<Expr> args = GetCallArgs(call);
   int n_input_var = input_dtensor_sinfos.size();
   for (int i = 0; i < n_input_var; i++) {
@@ -61,11 +61,11 @@ StructInfo InferShardingSpec(const Call& call, const BlockBuilder& ctx,
       if (placement_spec->kind != distributed::PlacementSpecKind::kSharding) {
         continue;
       }
-      axis_group_graph.AddSrcShardingPoint({input_tensor.get(), placement_spec->axis},
-                                           {dtensor_sinfo->device_mesh, j});
+      axis_group_graph->AddSrcShardingPoint({input_tensor.get(), placement_spec->axis},
+                                            {dtensor_sinfo->device_mesh, j});
     }
   }
-  axis_group_graph.PropagateShardingSpec();
+  axis_group_graph->PropagateShardingSpec();
   Array<TensorStructInfo> orig_output_tensor_sinfos;
   if (const auto* tensor_sinfo = orig_output_sinfo.as<TensorStructInfoNode>()) {
     orig_output_tensor_sinfos.push_back(GetRef<TensorStructInfo>(tensor_sinfo));
@@ -85,7 +85,7 @@ StructInfo InferShardingSpec(const Call& call, const BlockBuilder& ctx,
       distributed::AxisShardingSpec sharding_spec;
       bool has_sharding_spec;
       std::tie(sharding_spec, has_sharding_spec) =
-          axis_group_graph.GetAxisShardingSpec({output_var.get(), i, idx});
+          axis_group_graph->GetAxisShardingSpec({output_var.get(), i, idx});
       if (has_sharding_spec) {
         output_placement_specs.Set(sharding_spec.second, distributed::PlacementSpec::Sharding(i));
       }
