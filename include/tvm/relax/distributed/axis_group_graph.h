@@ -534,8 +534,6 @@ void BuildAxisGraphCallTIR(const Var& output_var, const Call& call, const tir::P
                            distributed::AxisGroupGraph* axis_group_graph);
 void BuildAxisGraphSimulatedAffine(const Var& output_var, const Call& call,
                                    distributed::AxisGroupGraph* axis_group_graph);
-void BuildAxisGraphRealizedAffineDense(const Var& output_var, const Call& call,
-                                       distributed::AxisGroupGraph* axis_group_graph);
 
 const TensorStructInfoNode* GetTensorStructInfo(Expr tensor);
 
