@@ -45,14 +45,14 @@ using FInferStructInfo =
     runtime::TypedPackedFunc<StructInfo(const Call& call, const BlockBuilder& ctx)>;
 
 /*!
- * \brief Construct an axis group subgraph based on an output and the call producing it.
+ * \brief Update an axis group subgraph based on an output and the call producing it.
  *
  * \param call The call expression.
- * \param axis_group_grap The output graph.
+ * \param axis_group_grap The graph to be updated.
  */
 // TODO: Wrap in runtime::TypedPackedFunc?
 using FAxisGroupGraphBuilder = runtime::TypedPackedFunc<void(
-    const Var& output_var, const Call& call, distributed::AxisGroupGraph* axis_group_graph)>;
+    const Var& output_var, const Call& call, const distributed::AxisGroupGraph& axis_group_graph)>;
 
 /*!
  * \brief Packed function implementation for operators. The relax operator will be lowered to

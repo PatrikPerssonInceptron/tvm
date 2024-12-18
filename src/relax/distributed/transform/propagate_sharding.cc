@@ -47,7 +47,7 @@ std::string any_to_string(T t) {
 }
 
 void CollectAxisGraphBinary(const VarBindingNode* binding, const CallNode* call,
-                            AxisGroupGraph* axis_group_graph) {
+                            AxisGroupGraph& axis_group_graph) {
   const std::vector<std::string> binary_op_names = {
       "add",     "subtract",      "multiply", "divide",     "power",     "floor_divide", "equal",
       "greater", "greater_equal", "less",     "less_equal", "not_equal", "minimum",      "maximum"};
@@ -61,7 +61,7 @@ void CollectAxisGraphBinary(const VarBindingNode* binding, const CallNode* call,
 }
 
 void CollectAxisGraphUnary(const VarBindingNode* binding, const CallNode* call,
-                           AxisGroupGraph* axis_group_graph) {
+                           AxisGroupGraph& axis_group_graph) {
   const std::vector<std::string> unary_op_names = {
       "abs",    "acos",     "acosh",
       "asin",   "asinh",    "atan",
@@ -83,7 +83,7 @@ void CollectAxisGraphUnary(const VarBindingNode* binding, const CallNode* call,
 }
 
 void CollectAxisGraphReduce(const VarBindingNode* binding, const CallNode* call,
-                            AxisGroupGraph* axis_group_graph) {
+                            AxisGroupGraph& axis_group_graph) {
   const std::vector<std::string> reduction_op_names = {"sum",  "max", "min",      "prod",
                                                        "mean", "std", "variance", "nn.softmax"};
   for (const auto& op_name : reduction_op_names) {
@@ -96,7 +96,7 @@ void CollectAxisGraphReduce(const VarBindingNode* binding, const CallNode* call,
 }
 
 void CollectAxisGraphMatmul(const VarBindingNode* binding, const CallNode* call,
-                            AxisGroupGraph* axis_group_graph) {
+                            AxisGroupGraph& axis_group_graph) {
   static const Op& matmul_op = Op::Get("relax.matmul");
   if (call->op.same_as(matmul_op)) {
     BuildAxisGraphMatmul(binding->var, GetRef<Call>(call), axis_group_graph);
@@ -104,7 +104,7 @@ void CollectAxisGraphMatmul(const VarBindingNode* binding, const CallNode* call,
 }
 
 void CollectAxisGraphPermuteDims(const VarBindingNode* binding, const CallNode* call,
-                                 AxisGroupGraph* axis_group_graph) {
+                                 AxisGroupGraph& axis_group_graph) {
   static const Op& permute_dims_op = Op::Get("relax.permute_dims");
   if (call->op.same_as(permute_dims_op)) {
     BuildAxisGraphPermuteDims(binding->var, GetRef<Call>(call), axis_group_graph);
@@ -112,7 +112,7 @@ void CollectAxisGraphPermuteDims(const VarBindingNode* binding, const CallNode* 
 }
 
 void CollectAxisGraphReshape(const VarBindingNode* binding, const CallNode* call,
-                             AxisGroupGraph* axis_group_graph) {
+                             AxisGroupGraph& axis_group_graph) {
   static const Op& reshape_op = Op::Get("relax.reshape");
   if (call->op.same_as(reshape_op)) {
     BuildAxisGraphReshape(binding->var, GetRef<Call>(call), axis_group_graph);
@@ -120,7 +120,7 @@ void CollectAxisGraphReshape(const VarBindingNode* binding, const CallNode* call
 }
 
 void CollectAxisGraphForDeviceMesh(const VarBindingNode* binding, const CallNode* call,
-                                   AxisGroupGraph* axis_group_graph) {
+                                   AxisGroupGraph& axis_group_graph) {
   Array<Expr> tensor_list;
   static const Op& call_tir_op = Op::Get("relax.call_tir");
   Array<Expr> args;
@@ -145,14 +145,14 @@ void CollectAxisGraphForDeviceMesh(const VarBindingNode* binding, const CallNode
  */
 class AxisGroupGraphBuilder : public ExprVisitor {
  public:
-  static void BuildAxisGroupGraph(AxisGroupGraph* axis_group_graph, const Function& func,
+  static void BuildAxisGroupGraph(AxisGroupGraph& axis_group_graph, const Function& func,
                                   const IRModule& mod) {
     AxisGroupGraphBuilder builder(axis_group_graph, mod);
     builder.VisitExpr(func);
   }
 
  private:
-  explicit AxisGroupGraphBuilder(AxisGroupGraph* axis_group_graph, IRModule mod)
+  explicit AxisGroupGraphBuilder(AxisGroupGraph& axis_group_graph, IRModule mod)
       : axis_group_graph_(axis_group_graph), mod_(mod) {}
 
   void VisitBinding_(const VarBindingNode* binding, const CallNode* val) {
@@ -165,22 +165,13 @@ class AxisGroupGraphBuilder : public ExprVisitor {
     CollectAxisGraphPermuteDims(binding, val, axis_group_graph_);
     CollectAxisGraphReshape(binding, val, axis_group_graph_);
 
-    if (val->op.same_as(Op::Get("inceptron.relax.simulated.affine"))) {
-      BuildAxisGraphSimulatedAffine(binding->var, GetRef<Call>(val), axis_group_graph_);
+    if (auto* op_ptr = val->op.as<OpNode>()) {
+      auto graph_builder_op_map = Op::GetAttrMap<FAxisGroupGraphBuilder>("FAxisGroupGraphBuilder");
+      auto op = GetRef<Op>(op_ptr);
+      if (graph_builder_op_map.count(op)) {
+        graph_builder_op_map[op](binding->var, GetRef<Call>(val), axis_group_graph_);
+      }
     }
-
-    // auto graph_builder_op_map = Op::GetAttrMap<FAxisGroupGraphBuilder>("FAxisGroupGraphBuilder");
-
-    // if (auto* op_ptr = val->op.as<OpNode>()) {
-    //   Op op = GetRef<Op>(op_ptr);
-    //   if (graph_builder_op_map.count(op)) {
-    //     graph_builder_op_map[op](binding, val, axis_group_graph_);
-    //   }
-    // }
-
-    // if (val->op.same_as(Op::Get("inceptron.relax.realized.affine.dense"))) {
-    //   BuildAxisGraphRealizedAffineDense(binding->var, GetRef<Call>(val), axis_group_graph_);
-    // }
 
     static const Op& call_tir_op = Op::Get("relax.call_tir");
     if (val->op.same_as(call_tir_op)) {
@@ -188,6 +179,7 @@ class AxisGroupGraphBuilder : public ExprVisitor {
         BuildAxisGraphCallTIR(binding->var, GetRef<Call>(val), func.value(), axis_group_graph_);
       }
     }
+
     CollectAxisGraphForDeviceMesh(binding, val, axis_group_graph_);
     // LOG_INFO << "### VisitBinding_ AFTER " << binding->var << " " << val->op;
     // LOG_INFO << *axis_group_graph_;
@@ -233,7 +225,7 @@ class AxisGroupGraphBuilder : public ExprVisitor {
     ExprVisitor::VisitBinding_(binding, val);
   }
 
-  AxisGroupGraph* axis_group_graph_;
+  AxisGroupGraph& axis_group_graph_;
   IRModule mod_;
 };
 
@@ -242,13 +234,13 @@ class AxisGroupGraphBuilder : public ExprVisitor {
  */
 class ShardingAnnotationCollector : public ExprVisitor {
  public:
-  static void CollectShardingAnnotation(AxisGroupGraph* axis_group_graph, const Function& func) {
+  static void CollectShardingAnnotation(AxisGroupGraph& axis_group_graph, const Function& func) {
     ShardingAnnotationCollector collector(axis_group_graph);
     collector.VisitExpr(func);
   }
 
  private:
-  explicit ShardingAnnotationCollector(AxisGroupGraph* axis_group_graph)
+  explicit ShardingAnnotationCollector(AxisGroupGraph& axis_group_graph)
       : axis_group_graph_(axis_group_graph) {}
   void VisitBinding_(const VarBindingNode* binding, const CallNode* val) {
     static const Op& annotate_sharding_op = Op::Get("relax.dist.annotate_sharding");
@@ -268,7 +260,7 @@ class ShardingAnnotationCollector : public ExprVisitor {
     ExprVisitor::VisitBinding_(binding, val);
   }
 
-  AxisGroupGraph* axis_group_graph_;
+  AxisGroupGraph& axis_group_graph_;
 };
 
 /*!
@@ -276,7 +268,7 @@ class ShardingAnnotationCollector : public ExprVisitor {
  */
 class ShardingConflictHandler : public ExprVisitor {
  public:
-  static void HandleShardingConflict(AxisGroupGraph* axis_group_graph, Function function) {
+  static void HandleShardingConflict(AxisGroupGraph& axis_group_graph, Function function) {
     axis_group_graph->PropagateShardingSpec();
     ShardingConflictHandler handler(axis_group_graph);
     handler.VisitExpr(function);
@@ -289,7 +281,7 @@ class ShardingConflictHandler : public ExprVisitor {
   }
 
  private:
-  explicit ShardingConflictHandler(AxisGroupGraph* axis_group_graph)
+  explicit ShardingConflictHandler(AxisGroupGraph& axis_group_graph)
       : axis_group_graph_(axis_group_graph) {}
 
   void CheckTensorShardingCompatible(Var var) {
@@ -361,7 +353,7 @@ class ShardingConflictHandler : public ExprVisitor {
     ExprVisitor::VisitBinding_(binding);
   }
 
-  AxisGroupGraph* axis_group_graph_;
+  AxisGroupGraph& axis_group_graph_;
 };
 
 /*!
@@ -369,7 +361,8 @@ class ShardingConflictHandler : public ExprVisitor {
  */
 class DistributedIRBuilder : public ExprMutator {
  public:
-  explicit DistributedIRBuilder(const IRModule& module) : ExprMutator(module) {}
+  explicit DistributedIRBuilder(const IRModule& module)
+      : ExprMutator(module), axis_group_graph_(make_object<AxisGroupGraphNode>()) {}
 
   IRModule BuildDistributedIR() {
     auto mod = builder_->GetContextIRModule();
@@ -393,7 +386,7 @@ class DistributedIRBuilder : public ExprMutator {
                                                int tuple_idx = 0) {
     int ndim = sinfo->ndim;
     DeviceMesh device_mesh =
-        std::get<0>(axis_group_graph_.GetAxisShardingSpec({expr.get(), -1, tuple_idx})).first;
+        std::get<0>(axis_group_graph_->GetAxisShardingSpec({expr.get(), -1, tuple_idx})).first;
     ICHECK(device_mesh.defined()) << expr << "[" << tuple_idx << "] is not assigned device mesh";
     Array<PlacementSpec> placement_specs(
         std::vector<PlacementSpec>(device_mesh->shape.size(), PlacementSpec::Replica()));
@@ -407,7 +400,7 @@ class DistributedIRBuilder : public ExprMutator {
       AxisShardingSpec sharding_spec;
       bool has_sharding_spec;
       std::tie(sharding_spec, has_sharding_spec) =
-          axis_group_graph_.GetAxisShardingSpec({expr.get(), i, tuple_idx});
+          axis_group_graph_->GetAxisShardingSpec({expr.get(), i, tuple_idx});
       if (has_sharding_spec) {
         int sharding_dim = sharding_spec.second;
         // LOG_INFO << "placement_specs.Set " << sharding_dim << " " << i;
@@ -449,15 +442,15 @@ class DistributedIRBuilder : public ExprMutator {
 
   Function RewriteFunction(Function func, IRModule mod) {
     // Step 1. Construct AxisGroupGraph
-    AxisGroupGraphBuilder::BuildAxisGroupGraph(&axis_group_graph_, func, mod);
+    AxisGroupGraphBuilder::BuildAxisGroupGraph(axis_group_graph_, func, mod);
     // LOG_INFO << "### BuildAxisGroupGraph ###";
     // LOG_INFO << axis_group_graph_;
     // Step 2. Collect Sharding Annotation
-    ShardingAnnotationCollector::CollectShardingAnnotation(&axis_group_graph_, func);
+    ShardingAnnotationCollector::CollectShardingAnnotation(axis_group_graph_, func);
     // // LOG_INFO << "### CollectShardingAnnotation ###";
     // // LOG_INFO << axis_group_graph_;
     // Step 3. Handle Sharding Conflict
-    ShardingConflictHandler::HandleShardingConflict(&axis_group_graph_, func);
+    ShardingConflictHandler::HandleShardingConflict(axis_group_graph_, func);
     // // LOG_INFO << "### HandleShardingConflict ###";
     // // LOG_INFO << axis_group_graph_;
 
@@ -483,7 +476,7 @@ class DistributedIRBuilder : public ExprMutator {
 
   Expr VisitExpr_(const CallNode* call) final {
     static const Op& call_tir_op = Op::Get("relax.call_tir");
-    FBuildAxisGraph f = [&](const Var& var, const Call& call, AxisGroupGraph* axis_group_graph) {
+    FBuildAxisGraph f = [&](const Var& var, const Call& call, AxisGroupGraph& axis_group_graph) {
       Optional<tir::PrimFunc> prim_func =
           MatchPrimFunc(this->builder_->GetContextIRModule(), call->args[0]);
       ICHECK(prim_func);
@@ -582,7 +575,7 @@ class DistributedIRBuilder : public ExprMutator {
     }
     // get annotated sinfo from axis group graph
     DeviceMesh device_mesh =
-        std::get<0>(axis_group_graph_.GetAxisShardingSpec({binding->var.get(), -1})).first;
+        std::get<0>(axis_group_graph_->GetAxisShardingSpec({binding->var.get(), -1})).first;
     ICHECK(device_mesh.defined());
     Array<Placement> placements;  // every tuple element has a placement
     for (int idx = 0; idx < static_cast<int>(orig_output_tensor_sinfos.size()); idx++) {
@@ -592,7 +585,7 @@ class DistributedIRBuilder : public ExprMutator {
         AxisShardingSpec sharding_spec;
         bool has_sharding_spec;
         std::tie(sharding_spec, has_sharding_spec) =
-            axis_group_graph_.GetAxisShardingSpec({binding->var.get(), i, idx});
+            axis_group_graph_->GetAxisShardingSpec({binding->var.get(), i, idx});
         if (has_sharding_spec) {
           placement_specs.Set(sharding_spec.second, PlacementSpec::Sharding(i));
         }
