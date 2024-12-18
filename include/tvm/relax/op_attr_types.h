@@ -51,8 +51,8 @@ using FInferStructInfo =
  * \param axis_group_grap The output graph.
  */
 // TODO: Wrap in runtime::TypedPackedFunc?
-using FAxisGroupGraphBuilder = void(const Var& output_var, const Call& call,
-                                    distributed::AxisGroupGraph* axis_group_graph);
+using FAxisGroupGraphBuilder = runtime::TypedPackedFunc<void(
+    const Var& output_var, const Call& call, distributed::AxisGroupGraph* axis_group_graph)>;
 
 /*!
  * \brief Packed function implementation for operators. The relax operator will be lowered to

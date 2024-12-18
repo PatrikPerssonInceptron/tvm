@@ -295,7 +295,7 @@ class AxisShardingSpecHash {
  * through the two axes. Although it only does sharding propagation, this data structure can be
  * extended to perform all kinds of propagation that happens on tensor axes.
  */
-class AxisGroupGraph {
+class AxisGroupGraphNode : public Object {
  public:
   enum class EdgeType { kAscend, kDescend, kSimbling };
 
@@ -377,7 +377,7 @@ class AxisGroupGraph {
   };
 
  public:
-  AxisGroupGraph() = default;
+  AxisGroupGraphNode() = default;
 
   /*!
    * \brief add edge between two axes
@@ -495,7 +495,7 @@ class AxisGroupGraph {
       AxisHash>
       axis_sharding_specs_priority_;
 
-  friend std::ostream& operator<<(std::ostream& ss, const AxisGroupGraph& agg) {
+  friend std::ostream& operator<<(std::ostream& ss, const AxisGroupGraphNode& agg) {
     ss << std::endl << "AxisGroupGraph src_axis_sharding_spec_" << std::endl;
     for (auto& [axis, sharding] : agg.src_axis_sharding_spec_) {
       ss << axis << " " << sharding.first << " " << sharding.second << std::endl;
@@ -513,6 +513,18 @@ class AxisGroupGraph {
     }
     return ss;
   }
+
+  static constexpr const uint32_t _type_index = TypeIndex::kDynamic;
+  static constexpr const char* _type_key = "relax.AxisGroupGraph";
+  TVM_DECLARE_BASE_OBJECT_INFO(AxisGroupGraphNode, Object);
+};
+
+class AxisGroupGraph : public ObjectRef {
+ public:
+  using EdgeType = AxisGroupGraphNode::EdgeType;
+
+  //  private:
+  TVM_DEFINE_MUTABLE_OBJECT_REF_METHODS(AxisGroupGraph, ObjectRef, AxisGroupGraphNode);
 };
 
 using FBuildAxisGraph = std::function<void(const Var& output_var, const Call& call,
