@@ -169,9 +169,18 @@ class AxisGroupGraphBuilder : public ExprVisitor {
       BuildAxisGraphSimulatedAffine(binding->var, GetRef<Call>(val), axis_group_graph_);
     }
 
-    if (val->op.same_as(Op::Get("inceptron.relax.realized.affine.dense"))) {
-      BuildAxisGraphRealizedAffineDense(binding->var, GetRef<Call>(val), axis_group_graph_);
-    }
+    // auto graph_builder_op_map = Op::GetAttrMap<FAxisGroupGraphBuilder>("FAxisGroupGraphBuilder");
+
+    // if (auto* op_ptr = val->op.as<OpNode>()) {
+    //   Op op = GetRef<Op>(op_ptr);
+    //   if (graph_builder_op_map.count(op)) {
+    //     graph_builder_op_map[op](binding, val, axis_group_graph_);
+    //   }
+    // }
+
+    // if (val->op.same_as(Op::Get("inceptron.relax.realized.affine.dense"))) {
+    //   BuildAxisGraphRealizedAffineDense(binding->var, GetRef<Call>(val), axis_group_graph_);
+    // }
 
     static const Op& call_tir_op = Op::Get("relax.call_tir");
     if (val->op.same_as(call_tir_op)) {

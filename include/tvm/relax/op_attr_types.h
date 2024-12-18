@@ -24,6 +24,7 @@
 #ifndef TVM_RELAX_OP_ATTR_TYPES_H_
 #define TVM_RELAX_OP_ATTR_TYPES_H_
 
+#include <tvm/include/tvm/relax/distributed/axis_group_graph.h>
 #include <tvm/relax/expr.h>
 #include <tvm/relax/struct_info.h>
 #include <tvm/te/schedule.h>
@@ -42,6 +43,16 @@ namespace relax {
  */
 using FInferStructInfo =
     runtime::TypedPackedFunc<StructInfo(const Call& call, const BlockBuilder& ctx)>;
+
+/*!
+ * \brief Construct an axis group subgraph based on an output and the call producing it.
+ *
+ * \param call The call expression.
+ * \param axis_group_grap The output graph.
+ */
+// TODO: Wrap in runtime::TypedPackedFunc?
+using FAxisGroupGraphBuilder = void(const Var& output_var, const Call& call,
+                                    distributed::AxisGroupGraph* axis_group_graph);
 
 /*!
  * \brief Packed function implementation for operators. The relax operator will be lowered to
