@@ -105,7 +105,9 @@ def get_constant(
         return var
 
 
-def get_value(token, value_dict: Dict[str, tvm.tir.SizeVar]) -> Union[int, tvm.tir.SizeVar]:
+def get_value(
+    token, value_dict: Dict[str, tvm.tir.SizeVar], analyzer: tvm.arith.Analyzer
+) -> Union[int, tvm.tir.SizeVar]:
     """Converts to token to an integer value if it a constant, otherwise it generates a SizeVar
 
     Parameters
@@ -126,13 +128,15 @@ def get_value(token, value_dict: Dict[str, tvm.tir.SizeVar]) -> Union[int, tvm.t
         return int(token)
     except ValueError:
         if token not in value_dict or token == "?":
-            value_dict[token] = tvm.tir.SizeVar(token, "int64")
+            var = tvm.tir.SizeVar(token, "int64")
+            analyzer.update(var, tvm.arith.ConstIntBound(1, tvm.arith.ConstIntBound.POS_INF))
+            value_dict[token] = var
         value = value_dict[token]
         return value
 
 
 def parse_shape_name(
-    name: str, value_dict: Dict[str, tvm.tir.SizeVar]
+    name: str, value_dict: Dict[str, tvm.tir.SizeVar], analyzer: tvm.arith.Analyzer
 ) -> Union[tir.PrimExpr, tvm.tir.SizeVar]:
     """Converts expressions in the shape dimension name to prim expressions.
 
@@ -167,7 +171,7 @@ def parse_shape_name(
         if token in operators:
             operator_stack.append(token)
         else:
-            value = get_value(token, value_dict)
+            value = get_value(token, value_dict, analyzer)
             if value_stack and operator_stack:
                 prev_value = value_stack.pop()
                 op = operator_stack.pop()
@@ -183,7 +187,9 @@ def parse_shape_name(
 
 
 def get_info(
-    info_proto: onnx.onnx_ml_pb2.ValueInfoProto, value_dict: Dict[str, tvm.tir.SizeVar]
+    info_proto: onnx.onnx_ml_pb2.ValueInfoProto,
+    value_dict: Dict[str, tvm.tir.SizeVar],
+    analyzer: tvm.arith.Analyzer,
 ) -> Tuple[str, List, str, List, Dict]:
     """Extract the shape from a ValueInfoProto.
 
@@ -207,7 +213,7 @@ def get_info(
         name = dim.dim_param
         value = dim.dim_value
         if value is None or value == 0:
-            value = parse_shape_name(name, value_dict)
+            value = parse_shape_name(name, value_dict, analyzer)
             shape_name.append(name)
         else:
             shape_name.append(value)
@@ -1526,6 +1532,8 @@ class Neg(OnnxOpConverter):
         if isinstance(inputs[0], relax.Constant):
             data_np = inputs[0].data.numpy()
             return relax.const(_np.negative(data_np), inputs[0].struct_info.dtype)
+        if isinstance(inputs[0], relax.PrimValue):
+            return relax.PrimValue(-inputs[0].value)
         return relax.op.negative(inputs[0])
 
 
@@ -1749,6 +1757,20 @@ def get_prim_value_list(values):
     return new_values
 
 
+def canonicalize_index(index, extent, stride):
+
+    if index == tvm.arith.ConstIntBound.POS_INF:
+        return extent
+
+    begin_range = tvm.tir.if_then_else(stride < 0, -1, 0)
+
+    end_range = tvm.tir.if_then_else(stride < 0, extent - 1, extent)
+
+    index = tvm.tir.if_then_else(index < 0, index + extent, index)
+
+    return tvm.tir.min(tvm.tir.max(index, begin_range), end_range)
+
+
 class Slice(OnnxOpConverter):
     """Converts an onnx Splice node into an equivalent Relax expression."""
 
@@ -1803,14 +1825,22 @@ class Slice(OnnxOpConverter):
             [isinstance(param, (tir.IntImm, int)) for param in [*starts, *ends, *steps]]
         )
 
+        starts = [
+            bb.get_analyzer().simplify(canonicalize_index(e, data.struct_info.shape[a], s))
+            for e, a, s in zip(starts, axes, steps)
+        ]
+
+        ends = [
+            bb.get_analyzer().simplify(canonicalize_index(e, data.struct_info.shape[a], s))
+            for e, a, s in zip(ends, axes, steps)
+        ]
+
         # Converting PrimExpr to PrimValue since relax.op.strided_slice does not accept PrimExpr
         starts = get_prim_value_list(starts)
         ends = get_prim_value_list(ends)
         steps = get_prim_value_list(steps)
 
-        return relax.op.strided_slice(
-            data, axes, starts, ends, steps, assume_inbound=assume_inbound
-        )
+        return relax.op.strided_slice(data, axes, starts, ends, steps, assume_inbound=True)
 
 
 class Pad(OnnxOpConverter):
@@ -2904,15 +2934,11 @@ class DepthToSpace(OnnxOpConverter):
         mode = attr.get("mode", b"DCR").decode("utf-8")
         b, c, h, w = inputs[0].struct_info.shape
         if mode == "DCR":
-            x = relax.op.reshape(
-                inputs[0], (b, block_size, block_size, c // (block_size**2), h, w)
-            )
+            x = relax.op.reshape(inputs[0], (b, block_size, block_size, c // (block_size**2), h, w))
             x = relax.op.permute_dims(x, [0, 3, 4, 1, 5, 2])
             return relax.op.reshape(x, (b, c // (block_size**2), h * block_size, w * block_size))
         elif mode == "CRD":
-            x = relax.op.reshape(
-                inputs[0], (b, c // (block_size**2), block_size, block_size, h, w)
-            )
+            x = relax.op.reshape(inputs[0], (b, c // (block_size**2), block_size, block_size, h, w))
             x = relax.op.permute_dims(x, [0, 1, 4, 2, 5, 3])
             return relax.op.reshape(x, (b, c // (block_size**2), h * block_size, w * block_size))
         else:
@@ -3402,7 +3428,9 @@ class ONNXGraphImporter:
         for i in graph.input:
             # from onnx v0.2, GraphProto.input has type ValueInfoProto,
             #  and the name is 'i.name'
-            i_name, i_shape, d_type, i_shape_name, value_dict = get_info(i, value_dict)
+            i_name, i_shape, d_type, i_shape_name, value_dict = get_info(
+                i, value_dict, self.bb.get_analyzer()
+            )
             if i_name not in self._nodes:
                 self._num_input += 1
                 self._input_names.append(i_name)
@@ -3640,7 +3668,7 @@ def from_onnx(
             )
         )
 
-    try:
+    """try:
         import onnx  # pylint: disable=import-outside-toplevel, redefined-outer-name
 
         if hasattr(onnx.checker, "check_model"):
@@ -3651,7 +3679,7 @@ def from_onnx(
                 # the checker is a bit violent about errors, so simply print warnings here
                 warnings.warn(str(exception))
     except ImportError as error:
-        raise ImportError("Unable to import onnx which is required {}".format(error))
+        raise ImportError("Unable to import onnx which is required {}".format(error))"""
 
     g = ONNXGraphImporter(
         shape_dict,
