@@ -96,10 +96,11 @@ Array<TensorStructInfo> GetTensorStructInfoFromTuple(const Call& call, const Blo
   for (StructInfo field_sinfo : tuple_sinfo->fields) {
     const auto* field_tensor_sinfo = field_sinfo.as<TensorStructInfoNode>();
     if (field_tensor_sinfo == nullptr) {
-      ctx->ReportFatal(
-          Diagnostic::Error(call)
-          << call->op << " expects the input to be a Tuple of Tensors. However, the given input is "
-          << tup->struct_info_);
+      ctx->ReportFatal(Diagnostic::Error(call)
+                       << call->op
+                       << " expects the input tuple items to be TensorStructInfoNode. However, the "
+                          "items are "
+                       << field_sinfo->GetTypeKey());
     }
     tensor_sinfo.push_back(GetRef<TensorStructInfo>(field_tensor_sinfo));
   }

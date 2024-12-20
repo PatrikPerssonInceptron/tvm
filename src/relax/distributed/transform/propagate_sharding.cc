@@ -121,19 +121,27 @@ void CollectAxisGraphReshape(const VarBindingNode* binding, const CallNode* call
 
 void CollectAxisGraphForDeviceMesh(const VarBindingNode* binding, const CallNode* call,
                                    AxisGroupGraph& axis_group_graph) {
-  Array<Expr> tensor_list;
   static const Op& call_tir_op = Op::Get("relax.call_tir");
+  static const Op& concat_op = Op::Get("relax.concat");
+
   Array<Expr> args;
+
   if (call->op.same_as(call_tir_op)) {
     args = Downcast<Tuple>(call->args[1])->fields;
+  } else if (call->op.same_as(concat_op)) {
+    args = Downcast<Tuple>(call->args[0])->fields;
   } else {
     args = call->args;
   }
+
+  Array<Expr> tensor_list;
+
   for (const auto& arg : args) {
     if (arg->struct_info_.as<TensorStructInfoNode>()) {
       tensor_list.push_back(arg);
     }
   }
+
   for (int i = 0; i < static_cast<int>(tensor_list.size()); i++) {
     axis_group_graph->JoinAxis(Axis(tensor_list[i].get(), -1), {binding->var.get(), -1},
                                distributed::AxisGroupGraph::EdgeType::kDescend);
