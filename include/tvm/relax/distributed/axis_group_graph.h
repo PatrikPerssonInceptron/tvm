@@ -220,28 +220,15 @@ struct Axis {
   }
 
   friend std::ostream& operator<<(std::ostream& ss, const Axis& axis) {
-    ICHECK_EQ(axis.tuple_index, 0);
-    std::ostringstream sinfo_ss;
-    sinfo_ss << axis.tensor->struct_info_;
-    auto sinfo = sinfo_ss.str();
+    // std::ostringstream sinfo_ss;
+    // sinfo_ss << axis.tensor->struct_info_;
+    // auto sinfo = sinfo_ss.str();
+    // auto start = 9;
+    // auto end = sinfo.find_first_of(")", start) + 1;
+    // auto shape = sinfo.substr(start, end - start);
 
-    auto start = 9;
-    auto end = sinfo.find_first_of(")", start) + 1;
-
-    // const char* tensor_name;
-    // if (sinfo == "R.Tensor((2, 4))") {
-    //   tensor_name = "x";
-    // } else if (sinfo == "R.Tensor((4, 8))") {
-    //   tensor_name = "w0";
-    // } else if (sinfo == "R.Tensor((2, 8))") {
-    //   tensor_name = "y";
-    // } else {
-    //   ICHECK(false) << sinfo;
-    // }
-
-    // ss << "[" << axis.tensor->struct_info_ << " (" << axis.tensor << ") " << axis.dim << "]";
-    ss << "[" << sinfo.substr(start, end - start) << " (" << axis.tensor << ") " << " " << axis.dim
-       << "]";
+    ss << "[" << GetRef<Expr>(axis.tensor) << " " << axis.dim
+       << (axis.tuple_index == 0 ? std::string("") : " " + std::to_string(axis.tuple_index)) << "]";
     return ss;
   }
 };
@@ -502,19 +489,22 @@ class AxisGroupGraphNode : public Object {
   friend std::ostream& operator<<(std::ostream& ss, const AxisGroupGraphNode& agg) {
     ss << std::endl << "AxisGroupGraph src_axis_sharding_spec_" << std::endl;
     for (auto& [axis, sharding] : agg.src_axis_sharding_spec_) {
-      ss << axis << " " << sharding.first << " " << sharding.second << std::endl;
+      ss << "    " << axis << " " << sharding.first << " " << sharding.second << std::endl;
+    }
+
+    ss << std::endl << "AxisGroupGraph axis_sharding_specs_priority_" << std::endl;
+    for (auto& [axis, _] : agg.axis_sharding_specs_priority_) {
+      ss << "    " << axis << std::endl;
     }
 
     ss << std::endl << "AxisGroupGraph graph_" << std::endl;
-    for (auto& [_axis, edges] : agg.graph_) {
-      // ss << axis << std::endl;
-      // for (auto& edge : edges) {
-      //   ss << "    " << edge << std::endl;
-      // }
+    for (auto& [axis, edges] : agg.graph_) {
+      ss << axis << std::endl;
       for (auto& edge : edges) {
-        ss << edge << std::endl;
+        ss << "    " << edge << std::endl;
       }
     }
+
     return ss;
   }
 };
@@ -524,6 +514,11 @@ class AxisGroupGraph : public ObjectRef {
   using EdgeType = AxisGroupGraphNode::EdgeType;
 
   TVM_DEFINE_MUTABLE_OBJECT_REF_METHODS(AxisGroupGraph, ObjectRef, AxisGroupGraphNode);
+
+  friend std::ostream& operator<<(std::ostream& ss, const AxisGroupGraph& agg) {
+    ss << *static_cast<AxisGroupGraphNode*>(agg.data_.get());
+    return ss;
+  }
 };
 
 using FBuildAxisGraph = std::function<void(const Var& output_var, const Call& call,

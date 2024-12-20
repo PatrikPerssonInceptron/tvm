@@ -292,14 +292,21 @@ class ShardingConflictHandler : public ExprVisitor {
     int ndim = sinfo->ndim;
     std::unordered_set<int> sharded_mesh_dim;
     Optional<DeviceMesh> device_mesh;
+
+    // LOG_INFO << "Sharding " << var << " " << shape->values;
+    // LOG_INFO << axis_group_graph_;
+
     for (int i = -1; i < ndim; i++) {
       AxisShardingSpec sharding_spec;
       int has_sharding_spec;
       std::tie(sharding_spec, has_sharding_spec) =
           axis_group_graph_->GetAxisShardingSpec({var.get(), i});
+
       if (!has_sharding_spec) {
         continue;
       }
+
+      // LOG_INFO << "  sharding_spec " << sharding_spec.first << " " << sharding_spec.second;
 
       if (device_mesh.defined()) {
         ICHECK(StructuralEqual()(device_mesh.value(), sharding_spec.first))
@@ -384,6 +391,9 @@ class DistributedIRBuilder : public ExprMutator {
 
   DTensorStructInfo ConvertToDTensorStructInfo(TensorStructInfo sinfo, Expr expr,
                                                int tuple_idx = 0) {
+    LOG_INFO << "ConvertToDTensorStructInfo " << expr;
+    LOG_INFO << axis_group_graph_;
+
     int ndim = sinfo->ndim;
     DeviceMesh device_mesh =
         std::get<0>(axis_group_graph_->GetAxisShardingSpec({expr.get(), -1, tuple_idx})).first;
@@ -447,22 +457,19 @@ class DistributedIRBuilder : public ExprMutator {
     // LOG_INFO << axis_group_graph_;
     // Step 2. Collect Sharding Annotation
     ShardingAnnotationCollector::CollectShardingAnnotation(axis_group_graph_, func);
-    // // LOG_INFO << "### CollectShardingAnnotation ###";
-    // // LOG_INFO << axis_group_graph_;
+    // LOG_INFO << "### CollectShardingAnnotation ###";
+    // LOG_INFO << axis_group_graph_;
     // Step 3. Handle Sharding Conflict
     ShardingConflictHandler::HandleShardingConflict(axis_group_graph_, func);
-    // // LOG_INFO << "### HandleShardingConflict ###";
-    // // LOG_INFO << axis_group_graph_;
+    // LOG_INFO << "### HandleShardingConflict ###";
+    // LOG_INFO << axis_group_graph_;
 
     // Step 4. Rewrite Function
     Array<Var> new_params;
     for (const Var& var : func->params) {
       if (GetStructInfoAs<TensorStructInfoNode>(var) || GetStructInfoAs<TupleStructInfoNode>(var)) {
         std::cout << std::endl;
-        // LOG_INFO << "##### " << var << " #####";
-        // LOG_INFO << "var " << var->struct_info_;
         Var new_param = Downcast<Var>(RewriteInputTensorAndConstant(var));
-        // LOG_INFO << "new_param " << new_param->struct_info_;
         input_tensor_remap_.Set(var, new_param);
         new_params.push_back(new_param);
       } else {
