@@ -399,8 +399,8 @@ class DistributedIRBuilder : public ExprMutator {
 
   DTensorStructInfo ConvertToDTensorStructInfo(TensorStructInfo sinfo, Expr expr,
                                                int tuple_idx = 0) {
-    LOG_INFO << "ConvertToDTensorStructInfo " << expr;
-    LOG_INFO << axis_group_graph_;
+    // LOG_INFO << "ConvertToDTensorStructInfo " << expr;
+    // LOG_INFO << axis_group_graph_;
 
     int ndim = sinfo->ndim;
     DeviceMesh device_mesh =

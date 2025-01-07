@@ -414,7 +414,7 @@ StructInfo InferDistStructInfoConcat(const Call& call, const BlockBuilder& ctx) 
 
   const auto device_mesh = dtensor_sinfos[0]->device_mesh;
   const auto placement = dtensor_sinfos[0]->placement;
-  ICHECK_EQ(placement, distributed::Placement::FromText("R"));
+  ICHECK_EQ(placement->ToString(), "R");
 
   auto to_dtensor_sinfo = [&](TensorStructInfo sinfo) {
     return distributed::DTensorStructInfo(sinfo, device_mesh, placement);

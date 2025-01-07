@@ -758,9 +758,8 @@ class Normalizer : public BlockBuilderImpl, private ExprFunctor<Expr(const Expr&
 
     if (!node->struct_info_.defined()) {
       auto opt = MatchStructInfo<TupleStructInfo>(node->tuple);
-      ICHECK(opt) << "The struct info of Tuple must be TupleStructInfo, "
-                  << "but expression " << node->tuple << " has struct info "
-                  << node->tuple->struct_info_;
+      ICHECK(opt) << "The struct info of Tuple must be TupleStructInfo, " << "but expression "
+                  << node->tuple << " has struct info " << node->tuple->struct_info_;
       UpdateStructInfo(node, opt.value()->fields[node->index]);
     }
 
@@ -826,16 +825,18 @@ class Normalizer : public BlockBuilderImpl, private ExprFunctor<Expr(const Expr&
   StructInfo InferStructInfo(const Call& call) {
     if (auto* op_ptr = call->op.as<OpNode>()) {
       // Case 1: the op field is a primitive op, look up FInferStructInfo attribute
+      static const Op& concat_op = Op::Get("relax.concat");
       Op op = GetRef<Op>(op_ptr);
+      auto args = call->op.same_as(concat_op) ? Downcast<Tuple>(call->args[0])->fields : call->args;
       bool is_dist_op = false;
-      for (const auto& arg : call->args) {
+      for (const auto& arg : args) {
         if (arg->struct_info_.as<distributed::DTensorStructInfoNode>()) {
           is_dist_op = true;
           break;
         }
       }
       if (is_dist_op) {
-        for (const auto& arg : call->args) {
+        for (const auto& arg : args) {
           ICHECK(!arg->struct_info_.as<TensorStructInfoNode>())
               << "Distributed operator must take DTensor instead of Tensor as input";
         }
@@ -963,8 +964,8 @@ class Normalizer : public BlockBuilderImpl, private ExprFunctor<Expr(const Expr&
               if (free_dataflow_vars.size()) {
                 LOG(FATAL)
                     << "Malformed AST: "
-                    << "A DataflowVar may only be used within a DataflowBlock.  "
-                    << "The variable " << binding->var << " is defined within a DataflowBlock, "
+                    << "A DataflowVar may only be used within a DataflowBlock.  " << "The variable "
+                    << binding->var << " is defined within a DataflowBlock, "
                     << "but is bound to a SeqExpr that contains non-dataflow BindingBlocks.  "
                     << "These non-dataflow BindingBlocks use the DataflowVars "
                     << free_dataflow_vars << ", which is invalid.";
