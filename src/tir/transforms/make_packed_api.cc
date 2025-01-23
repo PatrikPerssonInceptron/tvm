@@ -384,6 +384,12 @@ PrimFunc MakePackedAPI(PrimFunc func) {
   }
 
   for (const auto& kv : buffer_def) {
+    if (kv.first->name_hint == "matmul.var_lv2") {
+      LOG_INFO << kv.first;
+      LOG_INFO << kv.second;
+      LOG_INFO << device_type;
+      LOG_INFO << device_id;
+    }
     binder.BindDLTensor(kv.second, device_type, device_id, kv.first,
                         name_hint + "." + kv.first->name_hint);
     arg_buffer_declarations.push_back(DeclBuffer(kv.second, nop));
@@ -416,6 +422,15 @@ PrimFunc MakePackedAPI(PrimFunc func) {
       {seq_init, binder.init_nest(), seq_check, binder.asserts(), arg_buffer_declarations}, body);
   func_ptr->body = body;
   func_ptr->params = args;
+
+  for (auto& assert : binder.asserts()) {
+    std::ostringstream ss;
+    ss << assert;
+    if (ss.str().find("matmul.var_lv2.shape[1]") != std::string::npos ||
+        ss.str().find("matmul.var_gv2.shape[1]") != std::string::npos) {
+      LOG_INFO << assert;
+    }
+  }
 
   Array<Var> undefined = UndefinedVars(func_ptr->body, func_ptr->params);
   ICHECK_EQ(undefined.size(), 0) << "In PrimFunc " << name_hint << " variables " << undefined

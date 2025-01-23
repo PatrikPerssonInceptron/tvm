@@ -207,6 +207,12 @@ ObjectRef ShardLoaderObj::Create(const std::string& path_to_metadata, const std:
       n->param_info_.emplace_back(ParamInfo{&file_record, &param_record, shard_info});
     }
   }
+
+  for (auto& p : n->param_info_) {
+    LOG_INFO << "--- " << p.param->name << " " << p.param->shape << " " << p.param->nbytes << " "
+             << p.param->dtype << " " << p.shard_info.funcs[0].name;
+  }
+
   return ObjectRef(std::move(n));
 }
 
@@ -317,8 +323,7 @@ NDArray ShardLoaderObj::Load(int weight_index) const {
     ShapeTuple shape = param_info.shard_info.funcs.back().output_info.shape;
     DataType dtype = param_info.shard_info.funcs.back().output_info.dtype;
     ICHECK(shape.size() >= 1 && shape[0] == num_shards)
-        << "ValueError: The first dimension of the "
-        << "output shape must be equal to the "
+        << "ValueError: The first dimension of the " << "output shape must be equal to the "
         << "number of shards, but got: " << shape << " and num_shards = " << num_shards;
     NDArray recv = NDArray::Empty(ShapeTuple(shape.begin() + 1, shape.end()), dtype, device);
     if (worker_id == 0) {
@@ -412,7 +417,9 @@ TVM_REGISTER_GLOBAL("runtime.disco.ShardLoaderLoad")
       const auto* loader = loader_obj.as<ShardLoaderObj>();
       CHECK(loader != nullptr) << "TypeError: Expected ShardLoaderObj, but gets: "
                                << loader_obj->GetTypeKey();
-      return loader->Load(IntegerFromShapeTuple(weight_index));
+      auto ret = loader->Load(IntegerFromShapeTuple(weight_index));
+      LOG_INFO << IntegerFromShapeTuple(weight_index) << " " << ret.Shape();
+      return ret;
     });
 TVM_REGISTER_GLOBAL("runtime.disco.ShardLoaderLoadPresharded")
     .set_body_typed([](ObjectRef loader_obj, ShapeTuple weight_index) {

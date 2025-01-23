@@ -823,8 +823,7 @@ CodeGenCPU::PackedCall CodeGenCPU::MakeCallPackedLowered(const Array<PrimExpr>& 
   std::string func_name = [&]() {
     auto ptr = args[0].as<StringImmNode>();
     ICHECK(ptr) << "Expected first argument of tir::Call to be "
-                << "a string containing the callee's name, "
-                << "but instead contained " << args[0];
+                << "a string containing the callee's name, " << "but instead contained " << args[0];
     return ptr->value;
   }();
   // call the function
@@ -1434,6 +1433,11 @@ llvm::Value* CodeGenCPU::CreateIntrinsic(const CallNode* op) {
 }
 
 void CodeGenCPU::VisitStmt_(const AssertStmtNode* op) {
+  // std::ostringstream ss;
+  // ss << op->condition;
+  // if (ss.str().find("matmul_var_lv2_shape[1] == T.int64(2304)") != std::string::npos) {
+  //   LOG_INFO << op;
+  // }
   EmitDebugLocation(op);
   llvm::Value* cond = MakeValue(op->condition);
   std::ostringstream os;
@@ -1445,6 +1449,7 @@ void CodeGenCPU::VisitStmt_(const AssertStmtNode* op) {
   llvm::LLVMContext* ctx = llvm_target_->GetContext();
   auto* fail_block = llvm::BasicBlock::Create(*ctx, "assert_fail", function_);
   auto* end_block = llvm::BasicBlock::Create(*ctx, "assert_end", function_);
+  //////////////////////////
   builder_->CreateCondBr(cond, end_block, fail_block, md_very_likely_branch_);
   // fail condition.
   builder_->SetInsertPoint(fail_block);

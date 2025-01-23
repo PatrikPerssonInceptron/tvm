@@ -166,7 +166,11 @@ bool Analyzer::CanProveEqual(const PrimExpr& lhs, const PrimExpr& rhs) {
   if (lhs->dtype.is_handle() || rhs->dtype.is_handle()) {
     return lhs.same_as(rhs);
   }
-  return CanProve(lhs - rhs == 0);
+  auto r = CanProve(lhs - rhs == 0);
+  // if (!r) {
+  //   LOG_INFO << "### " << lhs << " " << rhs;
+  // }
+  return r;
 }
 
 bool Analyzer::CanProveLessEqualThanSymbolicShapeValue(const PrimExpr& lhs, const PrimExpr& shape) {

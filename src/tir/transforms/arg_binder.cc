@@ -37,10 +37,12 @@ void BinderAddAssert(arith::Analyzer* ana, PrimExpr cond, const std::string& arg
                      std::vector<Stmt>* asserts) {
   PrimExpr scond = ana->Simplify(cond);
   if (is_zero(scond)) {
-    LOG(FATAL) << "Bind have an unmet assertion: " << cond << ", "
-               << " on argument " << arg_name;
+    LOG(FATAL) << "Bind have an unmet assertion: " << cond << ", " << " on argument " << arg_name;
   }
   if (!is_one(scond)) {
+    // LOG_WARNING << cond;
+    // LOG_WARNING << scond;
+    // volatile auto scond2 = ana->Simplify(cond);
     std::ostringstream os;
     os << "Argument " << arg_name << " has an unsatisfied constraint: " << cond;
     asserts->emplace_back(AssertStmt(scond, tvm::tir::StringImm(os.str()), Evaluate(0)));
@@ -50,7 +52,13 @@ void BinderAddAssert(arith::Analyzer* ana, PrimExpr cond, const std::string& arg
 bool ArgBinder::Bind_(const PrimExpr& arg, const PrimExpr& value, const std::string& arg_name,
                       bool with_lets) {
   ICHECK_EQ(arg.dtype(), value.dtype());
+
   if (const VarNode* v = arg.as<VarNode>()) {
+    if (arg_name == "matmul.var_lv2.shape[0]" || arg_name == "matmul.var_lv2.shape[1]" ||
+        arg_name == "matmul.var_gv2.shape[0]" || arg_name == "matmul.var_gv2.shape[1]") {
+      LOG_INFO << arg;
+      LOG_INFO << value;
+    }
     auto it = def_map_->find(v);
     if (it == def_map_->end()) {
       Var v_arg = Downcast<Var>(arg);
@@ -66,6 +74,21 @@ bool ArgBinder::Bind_(const PrimExpr& arg, const PrimExpr& value, const std::str
       BinderAddAssert(&analyzer_, it->second == value, arg_name, &asserts_);
     }
   } else {
+    if (arg_name == "matmul.var_lv2.shape[0]" || arg_name == "matmul.var_lv2.shape[1]" ||
+        arg_name == "matmul.var_gv2.shape[0]" || arg_name == "matmul.var_gv2.shape[1]") {
+      LOG_INFO << arg;
+      LOG_INFO << arg->GetTypeKey();
+      LOG_INFO << arg->type_index();
+      LOG_INFO << arg->dtype;
+      LOG_INFO << value;
+      LOG_INFO << value->GetTypeKey();
+      LOG_INFO << value->type_index();
+      LOG_INFO << value->dtype;
+    }
+    //   if (arg_name == "matmul.var_lv2.shape[1]") {
+    //     BinderAddAssert(&analyzer_, value > arg, arg_name, &asserts_);
+    //   }
+    // } else {
     BinderAddAssert(&analyzer_, arg == value, arg_name, &asserts_);
   }
   return false;
@@ -207,6 +230,19 @@ void ArgBinder::BindDLTensor(const Buffer& buffer, const PrimExpr& device_type,
         buffer->dtype == DataType::Int(1)) {
       break;
     }
+
+    if (shape_handle_name() == "matmul.var_lv2.shape" ||
+        shape_handle_name() == "matmul.var_gv2.shape") {
+      LOG_INFO << "\n\n### " << shape_handle_name();
+      LOG_INFO << k;
+      LOG_INFO << shape_element_name(k);
+      LOG_INFO << buffer->shape[k];
+      LOG_INFO << buf_shape;
+      LOG_INFO << buf_shape->shape;
+      LOG_INFO << buf_shape->strides;
+      LOG_INFO << BufferLoad(buf_shape, {IntImm(DataType::Int(32), k)});
+    }
+
     Bind_(buffer->shape[k],
           cast(buffer->shape[k].dtype(), BufferLoad(buf_shape, {IntImm(DataType::Int(32), k)})),
           shape_element_name(k), true);

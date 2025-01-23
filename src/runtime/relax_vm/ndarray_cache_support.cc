@@ -120,6 +120,14 @@ NDArrayCacheMetadata NDArrayCacheMetadata::LoadFromStr(const std::string& json_s
   }
   NDArrayCacheMetadata result = JSONAsNDArrayCacheMetadata(AsType<picojson::object>(json_info));
   result.path = path;
+
+  for (auto& file_record : result.records) {
+    for (auto& param_record : file_record.records) {
+      LOG_INFO << "## " << file_record.data_path << ": " << param_record.name << " "
+               << param_record.shape;
+    }
+  }
+
   return result;
 }
 
