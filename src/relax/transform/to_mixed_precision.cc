@@ -33,6 +33,8 @@
 #include "../op/tensor/datatype.h"
 #include "../op/tensor/linear_algebra.h"
 #include "infer_amp_utils.h"
+#include "tvm/relax/expr.h"
+#include "tvm/runtime/container/optional.h"
 #include "utils.h"
 
 namespace tvm {
@@ -612,6 +614,39 @@ Expr ToMixedPrecision(const Function& f, const DataType& out_dtype,
 }
 
 namespace transform {
+
+Optional<Array<String>> get_fp16_input_names(
+    String func_name, Optional<Map<String, Array<String>>> fp16_input_names) {
+  if (!fp16_input_names) {
+    return Optional<Array<String>>();
+  }
+
+  auto it = fp16_input_names.value().find(func_name);
+  if (it == fp16_input_names.value().end()) {
+    return Optional<Array<String>>();
+  }
+
+  return Optional<Array<String>>((*it).second);
+}
+
+Pass ToMixedPrecisionMap(const DataType& out_dtype,
+                         Optional<Map<String, Array<String>>> fp16_input_names) {
+  runtime::TypedPackedFunc<IRModule(IRModule, PassContext)> pass_func = [=](IRModule mod,
+                                                                            PassContext pc) {
+    IRModuleNode* new_module = mod.CopyOnWrite();
+    for (const auto& [gv, base_func] : mod->functions) {
+      if (base_func->IsInstance<FunctionNode>()) {
+        new_module->Update(gv, Downcast<Function>(ToMixedPrecision(
+                                   Downcast<Function>(base_func), out_dtype,
+                                   get_fp16_input_names(gv->name_hint, fp16_input_names))));
+      }
+    }
+    return GetRef<IRModule>(new_module);
+  };
+  return CreateModulePass(pass_func, 0, "ToMixedPrecisionMap", {});
+}
+
+TVM_REGISTER_GLOBAL("relax.transform.ToMixedPrecisionMap").set_body_typed(ToMixedPrecisionMap);
 
 Pass ToMixedPrecision(const DataType& out_dtype, Optional<Array<String>> fp16_input_names) {
   runtime::TypedPackedFunc<Function(Function, IRModule, PassContext)> pass_func =
