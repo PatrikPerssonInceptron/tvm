@@ -1812,12 +1812,13 @@ void CodeGenLLVM::BufferAccessHelper(
 }
 
 llvm::Value* CodeGenLLVM::VisitExpr_(const BufferLoadNode* op) {
-  if (op->buffer->name == "matmul.var_gv2.shape") {
-    LOG_INFO << "!!! " << op->buffer->name << ": " << op->buffer->shape << " " << op->indices << " "
-             << op->dtype;
-    auto val = MakeValue(op->buffer->data);
-    val->dump();
-  }
+  // if (op->buffer->name == "matmul.var_gv2.shape") {
+  //   LOG_INFO << "!!! " << op->buffer->name << ": " << op->buffer->shape << " " << op->indices <<
+  //   " "
+  //            << op->dtype;
+  //   auto val = MakeValue(op->buffer->data);
+  //   val->dump();
+  // }
   DataType value_dtype = op->dtype;
 
   std::vector<llvm::Value*> loads;
@@ -1838,8 +1839,6 @@ llvm::Value* CodeGenLLVM::VisitExpr_(const BufferLoadNode* op) {
 #endif
     } else {
 #if TVM_LLVM_VERSION >= 110
-      buffer_ptr.type->dump();
-      buffer_ptr.addr->dump();
       // LOG_INFO << "!!! " << buffer_ptr.type << " " << buffer_ptr.addr;
       load = builder_->CreateAlignedLoad(buffer_ptr.type, buffer_ptr.addr, llvm::Align(alignment),
                                          is_volatile);

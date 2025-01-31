@@ -85,11 +85,11 @@ bool ArgBinder::Bind_(const PrimExpr& arg, const PrimExpr& value, const std::str
       LOG_INFO << value->type_index();
       LOG_INFO << value->dtype;
     }
-    //   if (arg_name == "matmul.var_lv2.shape[1]") {
-    //     BinderAddAssert(&analyzer_, value > arg, arg_name, &asserts_);
-    //   }
+    // if (arg_name == "matmul.var_lv2.shape[1]" || arg_name == "matmul.var_gv2.shape[1]") {
+    //   BinderAddAssert(&analyzer_, value != arg, arg_name, &asserts_);
     // } else {
     BinderAddAssert(&analyzer_, arg == value, arg_name, &asserts_);
+    // }
   }
   return false;
 }
