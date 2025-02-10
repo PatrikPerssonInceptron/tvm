@@ -24,6 +24,7 @@
 
 #include <dmlc/json.h>
 #include <tvm/runtime/c_backend_api.h>
+#include <tvm/runtime/cuda/utils.h>
 #include <tvm/runtime/data_type.h>
 #include <tvm/runtime/packed_func.h>
 #include <tvm/runtime/profiling.h>
@@ -903,6 +904,7 @@ PackedFunc WrapTimeEvaluator(PackedFunc pf, Device dev, int number, int repeat, 
           arr1.CopyFrom(arr2);
         }
         DeviceAPI::Get(dev)->StreamSync(dev, nullptr);
+        cuda::BusyWait(1e-4);
         // start timing
         Timer t = Timer::Start(dev);
         for (int j = 0; j < number; ++j) {

@@ -51,7 +51,10 @@ if(USE_CUDA)
   set(CMAKE_CUDA_USE_RESPONSE_FILE_FOR_INCLUDES 0)
 
   tvm_file_glob(GLOB RUNTIME_CUDA_SRCS src/runtime/cuda/*.cc)
+  tvm_file_glob(GLOB RUNTIME_CUDA_KERNEL_SRCS src/runtime/cuda/*.cu)
   list(APPEND RUNTIME_SRCS ${RUNTIME_CUDA_SRCS})
+  list(APPEND RUNTIME_SRCS ${RUNTIME_CUDA_KERNEL_SRCS})
+
   list(APPEND COMPILER_SRCS src/target/opt/build_cuda_on.cc)
 
   list(APPEND TVM_LINKER_LIBS ${CUDA_NVRTC_LIBRARY})
