@@ -120,6 +120,7 @@ class ShardLoaderObj : public Object {
                           std::string shard_info, Module mod);
   /*! \brief Load the i-th parameter */
   NDArray Load(int weight_index) const;
+  NDArray LoadNamed(const std::string& param_name) const;
 
   NDArray LoadParamOnWorker0(int weight_index) const;
 
@@ -304,6 +305,12 @@ NDArray ShardLoaderObj::LoadDirect(int weight_index) const {
   return param->Load(device, &this->current_file_stream_);
 }
 
+NDArray ShardLoaderObj::LoadNamed(const std::string& param_name) const {
+  ICHECK(this->param_name_to_index_.count(param_name));
+  const auto param_idx = this->param_name_to_index_.at(param_name);
+  return Load(param_idx);
+}
+
 NDArray ShardLoaderObj::Load(int weight_index) const {
   DiscoWorker* worker = DiscoWorker::ThreadLocal();
   int worker_id = worker->worker_id;
@@ -317,8 +324,7 @@ NDArray ShardLoaderObj::Load(int weight_index) const {
     ShapeTuple shape = param_info.shard_info.funcs.back().output_info.shape;
     DataType dtype = param_info.shard_info.funcs.back().output_info.dtype;
     ICHECK(shape.size() >= 1 && shape[0] == num_shards)
-        << "ValueError: The first dimension of the "
-        << "output shape must be equal to the "
+        << "ValueError: The first dimension of the " << "output shape must be equal to the "
         << "number of shards, but got: " << shape << " and num_shards = " << num_shards;
     NDArray recv = NDArray::Empty(ShapeTuple(shape.begin() + 1, shape.end()), dtype, device);
     if (worker_id == 0) {
@@ -413,6 +419,13 @@ TVM_REGISTER_GLOBAL("runtime.disco.ShardLoaderLoad")
       CHECK(loader != nullptr) << "TypeError: Expected ShardLoaderObj, but gets: "
                                << loader_obj->GetTypeKey();
       return loader->Load(IntegerFromShapeTuple(weight_index));
+    });
+TVM_REGISTER_GLOBAL("runtime.disco.ShardLoaderLoadNamed")
+    .set_body_typed([](ObjectRef loader_obj, const std::string& param_name) {
+      const auto* loader = loader_obj.as<ShardLoaderObj>();
+      CHECK(loader != nullptr) << "TypeError: Expected ShardLoaderObj, but gets: "
+                               << loader_obj->GetTypeKey();
+      return loader->LoadNamed(param_name);
     });
 TVM_REGISTER_GLOBAL("runtime.disco.ShardLoaderLoadPresharded")
     .set_body_typed([](ObjectRef loader_obj, ShapeTuple weight_index) {
